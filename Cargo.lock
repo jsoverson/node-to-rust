@@ -13,3 +13,11 @@ version = "0.0.0"
 [[package]]
 name = "day-4-strings-wtf-2"
 version = "0.0.0"
+
+[[package]]
+name = "day-5-borrowing"
+version = "0.0.0"
+
+[[package]]
+name = "day-5-let-vs-const"
+version = "0.0.0"
