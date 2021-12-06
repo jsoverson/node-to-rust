@@ -1,0 +1,31 @@
+[package]
+name = "day-6-loads-of-strs"
+version = "0.0.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+[[bin]]
+name = "one-print"
+test = false
+bench = false
+path = "src/one-print.rs"
+
+[[bin]]
+name = "200-empty-prints"
+test = false
+bench = false
+path = "src/200-empty-prints.rs"
+
+[[bin]]
+name = "200-prints"
+test = false
+bench = false
+path = "src/200-prints.rs"
+
+[[bin]]
+name = "200-unique-prints"
+test = false
+bench = false
+path = "src/200-unique-prints.rs"
