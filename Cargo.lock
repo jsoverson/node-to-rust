@@ -21,3 +21,11 @@ version = "0.0.0"
 [[package]]
 name = "day-5-let-vs-const"
 version = "0.0.0"
+
+[[package]]
+name = "day-6-loads-of-strs"
+version = "0.0.0"
+
+[[package]]
+name = "day-7-syntax"
+version = "0.0.0"

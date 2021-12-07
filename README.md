@@ -22,3 +22,16 @@ Borrowing:
 
 - `cargo run -p day-5-borrowing --bin borrow`
 - `cargo run -p day-5-borrowing --bin mutable-borrow` - intentionally does not compile
+
+### Day 6
+
+- `cargo run -p day-6-loads-of-strs --bin 200-unique-prints`
+- `cargo run -p day-6-loads-of-strs --bin 200-prints`
+- `cargo run -p day-6-loads-of-strs --bin 200-empty-prints`
+- `cargo run -p day-6-loads-of-strs --bin one-print`
+
+### Day 7
+
+Syntax:
+
+- `cargo run -p day-7-syntax`
