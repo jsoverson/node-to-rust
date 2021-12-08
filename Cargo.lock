@@ -29,3 +29,15 @@ version = "0.0.0"
 [[package]]
 name = "day-7-syntax"
 version = "0.0.0"
+
+[[package]]
+name = "day-8-maps"
+version = "0.0.0"
+
+[[package]]
+name = "day-8-structs"
+version = "0.0.0"
+
+[[package]]
+name = "day-9-structs"
+version = "0.0.0"

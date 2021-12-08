@@ -35,3 +35,15 @@ Borrowing:
 Syntax:
 
 - `cargo run -p day-7-syntax`
+
+### Day 8
+
+Maps:
+
+- `ts-node javascript/day-8/src/maps.ts`
+- `cargo run -p day-8-maps`
+
+Structs
+
+- `ts-node javascript/day-8/src/structs.ts`
+- `cargo run -p day-8-structs`
