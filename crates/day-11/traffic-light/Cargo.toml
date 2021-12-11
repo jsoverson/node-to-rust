@@ -1,5 +1,5 @@
 [package]
-name = "day-10-traits"
+name = "day-11-traffic-light"
 version = "0.0.0"
 edition = "2021"
 

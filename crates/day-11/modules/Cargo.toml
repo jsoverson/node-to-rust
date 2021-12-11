@@ -1,5 +1,5 @@
 [package]
-name = "day-10-traits"
+name = "day-11-modules"
 version = "0.0.0"
 edition = "2021"
 
@@ -7,3 +7,9 @@ edition = "2021"
 
 [dependencies]
 enum_dispatch = "0.3.7"
+
+[[bin]]
+name = "nested-submodules"
+test = false
+bench = false
+path = "src/nested-submodules.rs"

@@ -3,6 +3,13 @@
 version = 3
 
 [[package]]
+name = "day-10-before"
+version = "0.0.0"
+dependencies = [
+ "enum_dispatch",
+]
+
+[[package]]
 name = "day-10-traits"
 version = "0.0.0"
 dependencies = [
@@ -10,7 +17,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "day-10-traits2"
+name = "day-11-modules"
+version = "0.0.0"
+dependencies = [
+ "enum_dispatch",
+]
+
+[[package]]
+name = "day-11-traffic-light"
 version = "0.0.0"
 dependencies = [
  "enum_dispatch",

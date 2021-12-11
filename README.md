@@ -47,3 +47,14 @@ Structs
 
 - `ts-node javascript/day-8/src/structs.ts`
 - `cargo run -p day-8-structs`
+
+### Day 9
+
+### Day 10
+
+### Day 11
+
+Modules
+
+- `cargo run -p day-11-modules --bin nested-submodules`
+- `cargo run -p day-11-traffic-light`
