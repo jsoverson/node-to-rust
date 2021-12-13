@@ -12,23 +12,22 @@ dependencies = [
 [[package]]
 name = "day-10-traits"
 version = "0.0.0"
-dependencies = [
- "enum_dispatch",
-]
 
 [[package]]
 name = "day-11-modules"
 version = "0.0.0"
-dependencies = [
- "enum_dispatch",
-]
 
 [[package]]
 name = "day-11-traffic-light"
 version = "0.0.0"
-dependencies = [
- "enum_dispatch",
-]
+
+[[package]]
+name = "day-12-impl-asref-str"
+version = "0.0.0"
+
+[[package]]
+name = "day-12-impl-tostring"
+version = "0.0.0"
 
 [[package]]
 name = "day-4-hello-world"
