@@ -58,3 +58,14 @@ Modules
 
 - `cargo run -p day-11-modules --bin nested-submodules`
 - `cargo run -p day-11-traffic-light`
+
+### Day 12
+
+- `cargo run -p day-12-impl-tostring`
+- `cargo run -p day-12-impl-asref-str`
+
+### Day 13
+
+- `cargo run -p day-13-option`
+- `cargo run -p day-13-result`
+- `cargo run -p day-13-question-mark`
