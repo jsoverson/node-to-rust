@@ -12,13 +12,13 @@ This repository is for code related to the guide at: https://vino.dev/blog/node-
 
 ### Day 5
 
-Reassigning:
+#### Reassigning
 
 - JS: `node javascript/day-5/let-vs-const/reassigning.js`
 - Rust: `cargo run -p day-5-let-vs-const --bin reassigning`
 - `cargo run -p day-5-let-vs-const --bin reassigning-wrong-type` - intentionally does not compile
 
-Borrowing:
+#### Borrowing
 
 - `cargo run -p day-5-borrowing --bin borrow`
 - `cargo run -p day-5-borrowing --bin mutable-borrow` - intentionally does not compile
@@ -32,18 +32,18 @@ Borrowing:
 
 ### Day 7
 
-Syntax:
+#### Syntax
 
 - `cargo run -p day-7-syntax`
 
 ### Day 8
 
-Maps:
+#### Maps
 
 - `ts-node javascript/day-8/src/maps.ts`
 - `cargo run -p day-8-maps`
 
-Structs
+#### Structs
 
 - `ts-node javascript/day-8/src/structs.ts`
 - `cargo run -p day-8-structs`
@@ -54,7 +54,7 @@ Structs
 
 ### Day 11
 
-Modules
+#### Modules
 
 - `cargo run -p day-11-modules --bin nested-submodules`
 - `cargo run -p day-11-traffic-light`
@@ -69,3 +69,19 @@ Modules
 - `cargo run -p day-13-option`
 - `cargo run -p day-13-result`
 - `cargo run -p day-13-question-mark`
+
+### Day 14
+
+#### From/Into
+
+- `cargo run -p day-14-from-into`
+
+#### Errors
+
+These examples require setting an environment variable. How to do that in your environment might look different.
+
+- `MARKDOWN=README.md cargo run -p day-14-boxed-errors`
+- `MARKDOWN=README.md cargo run -p day-14-custom-error-type`
+- `MARKDOWN=README.md cargo run -p day-14-thiserror`
+- `MARKDOWN=README.md cargo run -p day-14-error-chain`
+- `MARKDOWN=README.md cargo run -p day-14-snafu`

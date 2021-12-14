@@ -1,0 +1,10 @@
+[package]
+name = "day-14-snafu"
+version = "0.0.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+markdown = "0.3.0"
+snafu = "0.6.10"
