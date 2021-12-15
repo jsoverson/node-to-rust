@@ -1,0 +1,8 @@
+[package]
+name = "day-15-closures"
+version = "0.0.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]

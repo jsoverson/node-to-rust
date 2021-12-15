@@ -144,6 +144,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "day-15-closures"
+version = "0.0.0"
+
+[[package]]
 name = "day-4-hello-world"
 version = "0.0.0"
 
