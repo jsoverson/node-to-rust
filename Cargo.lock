@@ -148,6 +148,26 @@ name = "day-15-closures"
 version = "0.0.0"
 
 [[package]]
+name = "day-16-elision"
+version = "0.0.0"
+
+[[package]]
+name = "day-16-static"
+version = "0.0.0"
+
+[[package]]
+name = "day-16-static-bounds"
+version = "0.0.0"
+
+[[package]]
+name = "day-16-type-differences"
+version = "0.0.0"
+
+[[package]]
+name = "day-16-unsafe-pointers"
+version = "0.0.0"
+
+[[package]]
 name = "day-4-hello-world"
 version = "0.0.0"
 

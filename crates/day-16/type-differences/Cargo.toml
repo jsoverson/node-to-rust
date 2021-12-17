@@ -1,0 +1,20 @@
+[package]
+name = "day-16-type-differences"
+version = "0.0.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+[[bin]]
+name = "impl-owned"
+test = false
+bench = false
+path = "src/impl-owned.rs"
+
+[[bin]]
+name = "impl-borrowed"
+test = false
+bench = false
+path = "src/impl-borrowed.rs"

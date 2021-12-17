@@ -85,3 +85,29 @@ These examples require setting an environment variable. How to do that in your e
 - `MARKDOWN=README.md cargo run -p day-14-thiserror`
 - `MARKDOWN=README.md cargo run -p day-14-error-chain`
 - `MARKDOWN=README.md cargo run -p day-14-snafu`
+
+### Day 16
+
+#### Closures
+
+- `cargo run -p day-15-closures`
+
+### Day 16
+
+#### Type differences
+
+- `cargo run -p day-16-type-differences --bin impl-owned`
+- `cargo run -p day-16-type-differences --bin impl-borrowed`
+
+#### `'static`
+
+- `cargo run -p day-16-static` - intentionally does not compile
+- `cargo run -p day-16-static-bounds` - intentionally does not compile
+
+#### Lifetime elision
+
+- `cargo run -p day-16-elision`
+
+#### Unsafe pointers
+
+- `cargo run -p day-16-unsafe-pointers`
