@@ -111,3 +111,19 @@ These examples require setting an environment variable. How to do that in your e
 #### Unsafe pointers
 
 - `cargo run -p day-16-unsafe-pointers`
+
+### Day 17
+
+#### Arrays
+
+- `cargo run -p day-17-arrays`
+- `ts-node javascript/day-17/src/arrays.ts`
+
+#### Iterators
+
+- `cargo run -p day-17-iterators`
+- `ts-node javascript/day-17/src/iterators.ts`
+
+#### Names example
+
+- `cargo run -p day-17-names`
