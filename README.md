@@ -127,3 +127,11 @@ These examples require setting an environment variable. How to do that in your e
 #### Names example
 
 - `cargo run -p day-17-names`
+
+### Day 18
+
+- `cargo run -p day-18-async --bin send-sync`
+- `cargo run -p day-18-async --bin simple`
+- `cargo run -p day-18-async --bin lazy`
+- `cargo run -p day-18-async --bin fs`
+- `cargo run -p day-18-async --bin async-blocks`

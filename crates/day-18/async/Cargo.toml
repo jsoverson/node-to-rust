@@ -1,0 +1,46 @@
+[package]
+name = "day-18-async"
+version = "0.0.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+thiserror = "1.0"
+tokio = { version = "1", features = ["full"] }
+
+[[bin]]
+path = "./src/simple.rs"
+harness = false
+test = false
+name = "simple"
+
+[[bin]]
+path = "./src/fs.rs"
+harness = false
+test = false
+name = "fs"
+
+[[bin]]
+path = "./src/send-sync.rs"
+harness = false
+test = false
+name = "send-sync"
+
+[[bin]]
+path = "./src/send-sync2.rs"
+harness = false
+test = false
+name = "send-sync2"
+
+[[bin]]
+path = "./src/lazy.rs"
+harness = false
+test = false
+name = "lazy"
+
+[[bin]]
+path = "./src/async-blocks.rs"
+harness = false
+test = false
+name = "async-blocks"
