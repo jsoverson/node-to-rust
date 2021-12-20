@@ -135,3 +135,10 @@ These examples require setting an environment variable. How to do that in your e
 - `cargo run -p day-18-async --bin lazy`
 - `cargo run -p day-18-async --bin fs`
 - `cargo run -p day-18-async --bin async-blocks`
+
+### Day 19
+
+First you must cd into `crates/day-19`
+
+- `cargo test`
+- `cargo run -p cli`
