@@ -1,4 +1,4 @@
 [workspace]
 members = ["crates/*/*"]
 
-exclude = ["crates/day-19/project"]
+exclude = ["crates/day-19/project", "crates/day-20/project"]

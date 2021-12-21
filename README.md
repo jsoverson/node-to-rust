@@ -138,7 +138,13 @@ These examples require setting an environment variable. How to do that in your e
 
 ### Day 19
 
-First you must cd into `crates/day-19`
+First you must cd into `crates/day-19/project`
 
 - `cargo test`
 - `cargo run -p cli`
+
+### Day 20
+
+First you must cd into `crates/day-19/project`
+
+- `RUST_LOG=debug cargo run -p cli -- test.wasm`
