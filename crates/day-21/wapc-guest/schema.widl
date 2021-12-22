@@ -1,0 +1,3 @@
+interface {
+  hello{name:string}: string
+}
