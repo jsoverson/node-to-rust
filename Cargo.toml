@@ -6,4 +6,6 @@ exclude = [
   "crates/day-20/project",
   "crates/day-21/project",
   "crates/day-21/wapc-guest",
+  "crates/day-22/project",
+  "crates/day-22/wapc-guest",
 ]

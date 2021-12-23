@@ -1,0 +1,10 @@
+
+interface {
+  render(blog:Blog, template: string): string
+}
+
+type Blog {
+  title: string,
+  body: string,
+  author: string
+}

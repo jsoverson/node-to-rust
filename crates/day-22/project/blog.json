@@ -1,0 +1,8 @@
+{
+  "blog": {
+    "title": "The Adventures of Tom Sawyer",
+    "body": "“TOM!”\n\nNo answer.\n\n“TOM!”\n\nNo answer.\n\n“What’s gone with that boy,  I wonder? You TOM!”\n\nNo answer.",
+    "author": "Mark Twain"
+  },
+  "template": "<html><head><title>{{ title }}</title></head><body><h1>{{ title }}</h1><h2>By {{ author }}</h2><p>{{ body }}</p></body></html>"
+}
