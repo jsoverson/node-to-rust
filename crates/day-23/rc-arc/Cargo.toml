@@ -1,0 +1,30 @@
+[package]
+name = "day-23-rc-arc"
+version = "0.0.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+parking_lot = "0.11"
+tokio = { version = "1", features = ["full"] }
+
+[[bin]]
+path = "./src/references.rs"
+name = "references"
+
+[[bin]]
+path = "./src/rc.rs"
+name = "rc"
+
+[[bin]]
+path = "./src/arc.rs"
+name = "arc"
+
+[[bin]]
+path = "./src/rwlock.rs"
+name = "rwlock"
+
+[[bin]]
+path = "./src/async.rs"
+name = "async"

@@ -213,6 +213,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "day-23-rc-arc"
+version = "0.0.0"
+dependencies = [
+ "parking_lot",
+ "tokio",
+]
+
+[[package]]
 name = "day-4-hello-world"
 version = "0.0.0"
 

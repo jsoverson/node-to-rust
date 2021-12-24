@@ -145,6 +145,47 @@ First you must cd into `crates/day-19/project`
 
 ### Day 20
 
-First you must cd into `crates/day-19/project`
+First you must cd into `crates/day-20/project`
 
-- `RUST_LOG=debug cargo run -p cli -- test.wasm`
+- `RUST_LOG=cli=debug cargo run -p cli`
+
+### Day 21
+
+#### waPC runner
+
+First you must cd into `crates/day-21/project`
+
+- `cargo run -p cli -- crates/my-lib/tests/test.wasm hello "Potter"`
+
+#### waPC guest (hello)
+
+First you must cd into `crates/day-21/wapc-guest`
+
+- Build with `make`
+
+### Day 22
+
+#### Serde
+
+- `cargo run -p day-22-serde`
+
+#### waPC runner
+
+First you must cd into `crates/day-22/project`
+
+- `cargo run -p cli -- crates/my-lib/tests/test.wasm hello hello.json`
+- `cargo run -p cli -- ./blog.wasm render ./blog.json`
+
+#### waPC guest (blog)
+
+First you must cd into `crates/day-22/wapc-guest`
+
+- Build with `make`
+
+### Day 23
+
+- `cargo run -p day-23-rc-arc --bin references`
+- `cargo run -p day-23-rc-arc --bin rc`
+- `cargo run -p day-23-rc-arc --bin arc`
+- `cargo run -p day-23-rc-arc --bin rwlock`
+- `cargo run -p day-23-rc-arc --bin async` - intentionally does not compile
