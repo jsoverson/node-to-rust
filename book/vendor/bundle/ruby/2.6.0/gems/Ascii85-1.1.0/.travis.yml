@@ -1,0 +1,30 @@
+language: ruby
+rvm:
+  - 1.9
+  - 2.0
+  - 2.1
+  - 2.2
+  - 2.3
+  - 2.4
+  - 2.5
+  - 2.6
+  - 2.7
+  - ruby-head
+  - jruby
+  - truffleruby
+env:
+  - RUBYOPT="--enable-frozen-string-literal"
+  - RUBYOPT=""
+matrix:
+  exclude:
+    - rvm: 1.9
+      env: RUBYOPT="--enable-frozen-string-literal"
+    - rvm: 2.0
+      env: RUBYOPT="--enable-frozen-string-literal"
+    - rvm: 2.1
+      env: RUBYOPT="--enable-frozen-string-literal"
+    - rvm: 2.2
+      env: RUBYOPT="--enable-frozen-string-literal"
+    # bundler did not support this back then
+    - rvm: 2.3
+      env: RUBYOPT="--enable-frozen-string-literal"

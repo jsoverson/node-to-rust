@@ -1,0 +1,169 @@
+= From npm to cargo
+
+== Introduction
+
+`cargo` is Rust's package manager and operates similarly to `npm` from node's universe. Cargo downloads dependiencs from https://crates.io[crates.io] by default. You can register an account and publish modules just as you would on https://npmjs.com[npmjs.com]. With some minor mapping you can translate almost everything you're used to in node to Rust.
+
+== `npm` to `cargo` mapping
+
+[discrete]
+==== Project settings file
+
+In node.js you have `package.json`. In Rust you have `Cargo.toml`.
+
+Cargo's manifest format is https://toml.io/en/[toml] rather than the JSON you're used to with npm's package.json. Cargo uses the `Cargo.toml` file to know what dependencies to download, how to run tests, and how to build your projects (https://doc.rust-lang.org/cargo/reference/manifest.html[among other things]).
+
+[discrete]
+==== Bootstrapping new projects
+
+In node.js it's `npm init`. In Rust you have `cargo init` and `cargo new`
+
+`cargo init` will initialize the current directory. `cargo new` initializes projects in a new directory.
+
+[discrete]
+==== Installing dependencies
+
+In node.js it's `npm install [dep]`. In Rust you can use `cargo add [dep]` if you install https://github.com/killercup/cargo-edit[`cargo-edit`] first. Note: *_not_* cargo-add, just in case you come across it.
+
+ $ cargo install cargo-edit
+
+This gives you four new commands: `add`, `rm`, `upgrade`, and `set-version`
+
+[discrete]
+==== Installing tools globally
+
+In node.js it's `npm install --global`. In Rust you have `cargo install`.
+
+Downloading, building, and placing executables in cargo's bin directory is handled with `cargo install`. If you installed rust via `rustup` then these are placed in a local user directory (usually `~/.cargo/bin`). You don't need to `sudo cargo install` anything.
+
+[discrete]
+==== Running tests
+
+In node.js it's `npm test`. In Rust you have `cargo test`.
+
+Cargo automates the running of unit tests, integration tests, and document tests through the `cargo test` command. There's a lot to Rust testing that we'll get to in later chapters.
+
+[discrete]
+==== Publishing modules
+
+In node.js it's `npm publish`. In Rust you have `cargo publish`.
+
+Easy peasy. You'll need to have an account on https://crates.io[crates.io] and set up the authentication details but cargo will help you there.
+
+[discrete]
+==== Running tasks
+
+In node.js it's `npm run xxx`. In Rust, it depends... You have commands for common tasks but the rest is up to you.
+
+In node.js you might use `npm run start` to run your server or executable. In Rust you would use `cargo run`. You can even use `cargo run --example xxx` to automatically run example code.
+
+In node.js you might use `npm run benchmarks` to profile your code. In Rust you have `cargo bench`.
+
+In node.js you might use `npm run build` to run webpack, tsc, or whatever. In Rust you have `cargo build`.
+
+In node.js you might use `npm run clean` to remove temporary or generated files. In Rust you have `cargo clean` which will wipe away your build folder (`target`, by default).
+
+In node.js you might use `npm run docs` to generate documentation. In Rust you have `cargo doc`.
+
+For code generation or pre-build steps, cargo supports https://doc.rust-lang.org/cargo/reference/build-scripts.html[build scripts] which run before the main build.
+
+A lot of your use cases are covered by default, but for anything else you have to fend for yourself.
+
+``npm``'s built-in task runner is one of the reasons why you rarely see ``Makefile``s in JavaScript projects. In the Rust ecosystem, you're not as lucky. Makefiles are still common but https://github.com/casey/just[`just`] is an attractive option that is gaining adoption. It irons out a lot of the wonkiness of ``Makefile``s while keeping a similar syntax.
+
+Install `just` via
+
+ $ cargo install just
+
+Other alternatives include `cargo-make` and `cargo-cmd`. I liked `cargo make` at first but its builtin tasks became just as annoying as ``make``'s. I've become skilled writing ``Makefile``s but I wish I spent that time learning `just` so take a lesson from me and start there. If you do go the `Makefile` route, check out https://gist.github.com/isaacs/62a2d1825d04437c6f08[isaacs's tutorial] and read https://tech.davis-hansson.com/p/make/[_Your makefiles are wrong_].
+
+=== Workspaces & monorepos
+
+Both package managers use a workspace concept to help you work with multiple small modules in a large project. In Rust, you create a `Cargo.toml` file in the root directory with a `[workspace]` entry that describes what's included and excluded in the workspace. It could be as simple as
+
+[source,toml]
+----
+[workspace]
+members = [
+  "crates/*"
+]
+----
+
+Workspace members that depend on each other can then just point to the local directory as their dependency, e.g.
+
+[source,toml]
+----
+[dependencies]
+other-project = { path = "../other-project" }
+----
+
+Check `cargo-workspaces` in the next section for a tool to help manage cargo workspaces.
+
+=== Additional tools
+
+==== `cargo-edit`
+
+If you skimmed the above portion, make sure you don't miss out on `cargo-edit` which adds `cargo add` and `cargo rm` (among others) to help manage dependencies on the command line.
+
+Install `cargo-edit` via
+
+ $ cargo install cargo-edit
+
+==== `cargo-workspaces`
+
+`cargo workspaces` (or `cargo ws`) simplifies creating and managing workspaces and their members. It was inspired by node's `lerna` and picks up where `cargo` leaves off. One of its most valuable features is automating the publish of a workspace's members, replacing local dependencies with the published versions.
+
+Install `cargo-workspaces` via
+
+ $ cargo install cargo-workspaces
+
+*_*note*_*: *workspaces* is plural. Don't install cargo-workspace expecting the same functionality.
+
+==== `cargo-expand`
+
+Macros in Rust are so common that 100% of the logic in your first Hello World app will be wrapped up into one. They're great at hand waving away code you don't want to write repeatedly but they can make code hard to follow and troubleshoot. `cargo expand` helps pull back the curtain.
+
+`cargo-expand` needs a nightly toolchain installed which you can get by running
+
+----
+rustup install nightly
+----
+
+Install `cargo-expand` via
+
+ $ cargo install cargo-expand
+
+Once installed, you can run `cargo expand [item]` to print out the fully generated source that rustc compiles.
+
+NOTE: `cargo expand` takes a *named item*, not a file path. Running `cargo expand main` doesn't expand `src/main.rs`, it expands the `main()` function in your project's root. With a common layout, to expand a module found in a file like `src/some_module/another.rs`, you'd run `cargo expand some_module::another`. Don't worry, we'll go over the module system in a few days.
+
+If you ran the `cargo new` command above to test it out, this is what your `src/main.rs` probably looks like.
+
+[source,rust]
+----
+fn main() {
+  println!("Hello, world!");
+}
+----
+
+`println!()` is a macro. Use `cargo expand` to see what code it generates.
+
+ $ cargo expand main
+ fn main() {
+     {
+         ::std::io::_print(::core::fmt::Arguments::new_v1(
+             &["Hello, world!\n"],
+             &match () {
+                 () => [],
+             },
+         ));
+     };
+ }
+
+==== `tomlq`
+
+While not a `cargo xxx` command, it's useful for querying data in `.toml` files like `Cargo.toml`. It's a less featureful sibling to the amazing `jq`. It's not critical, but it's worth knowing about.
+
+== Wrap-up
+
+The `npm` → `cargo` mapping is straightforward when you add `cargo-edit` and accept the lack of a standard task runner. In the next chapter we'll go over how to get your environment working with Visual Studio Code: link:./chapter-3-vscode.adoc[Chapter 3: Setting up VS Code].

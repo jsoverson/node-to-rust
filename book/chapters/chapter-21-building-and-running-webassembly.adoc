@@ -1,0 +1,419 @@
+= Building and Running WebAssembly
+
+== Introduction
+
+WebAssembly is the most exciting technology I've come across since, well, node.js. Server-side JavaScript had been around for ages, but node.js made it _attractive_. It was a real development platform, not just a scripting host. A lot of people -- myself included -- thought JavaScript could be _the_ universal compilation target. Write once, run anywhere. But https://en.wikipedia.org/wiki/Write_once,_run_anywhere[for real, this time]. We even had terms like "https://en.wikipedia.org/wiki/Isomorphic_JavaScript[Univeral JavaScript]" and "Isomorphic JavaScript." We had https://github.com/umdjs/umd[UMD], the universal module definition to share modules across any platform.
+
+We got close, but we didn't get all the way. Part of the problem is that a lot of important applications depend on serious CPU work. JavaScript just isn't cut out for that no matter how hard we try. We can't always rely on extending the web platform for every use case.
+
+WebAssembly was built for the web but has since gained traction as a universal bytecode format to run code everywhere from the cloud to the blockchain to the internet of things. WebAssembly offers no standard library and can only compute. WebAssembly modules can't even access the filesystem on their own. Many see these as shortcomings, but more are starting to consider them features. Since you _have_ to compile foreign standard libraries in your WebAssembly modules, it means every module reliably runs on its own. They're like docker containers for code. Add https://wasi.dev[WASI, the WebAssembly System Interface] and the you get granular permissions for expanded capabilities like filesystem or network access.
+
+Oh yeah, you can use WebAssembly in web browsers. That's cool, too.
+
+NOTE: This project builds off the previous two days. It's not critical that you have the foundation to make use of the code here, but it helps.
+
+
+== Building a WebAssembly module
+
+Compiling down into WebAssembly is easy. What's hard is making it do anything useful. WebAssembly can _still_ only talk in numbers (mostly). You can only pass numbers into WebAssembly and WebAssembly can only return numbers. That makes WebAssembly sound like its only good at math, but you could say the same thing about computers. We're skilled at making automatic math machines (a.k.a. "computers") good at _everything_.
+
+WebAssembly will eventually get to a point where it's easier to pass arbitrary data types. Until we get those standards, we have to define our own.
+
+=== Building applications with waPC
+
+The https://wapc.io[waPC] project, or WebAssembly Procedure Calls, defines a protocol for communicating in and out of WebAssembly. It's like a plugin framework with WebAssembly as the plugin format. In waPC terms, the implementer is a "host" and a WebAssembly module is a "guest."
+
+You can build waPC guests in Rust, TinyGo, and AssemblyScript and you can build waPC hosts in Rust, JavaScript/node.js, Go, Zig, and Swift.
+
+=== waPC redux
+
+We've written three guides on how to get started on waPC. The second helps you build WebAssembly modules in Rust and the third shows you how to run them in node.js.
+
+* https://vino.dev/blog/building-webassembly-platforms-with-wapc/[Building WebAssembly platforms with waPC]
+* https://vino.dev/blog/getting-started-with-wapc-and-webassembly/[Getting Started with waPC & WebAssembly]
+* https://vino.dev/blog/building-a-wapc-host-in-nodejs/[Building a waPC Host in Node.js]
+
+This guide will go through how to make a waPC host in Rust to run the same modules.
+
+=== Our test module
+
+We've pre-built a https://github.com/vinodotdev/node-to-rust/blob/master/crates/day-21/wapc-guest/build/wapc_guest.wasm[test module] as part of this book. It has one exposed operation, `hello` that takes a string and returns a string.
+
+=== Building a waPC host
+
+We started off building our project with tests in `my_lib`. Our one test runs a stub function `Module::from_file`. Now we need to finish things up.
+
+==== Reading files in Rust
+
+You can perform basic reads with `std::fs::read` and `std::fs::read_to_string`. Since we're loading binary data we'll need to use `fs::read` to get a list of bytes, a `Vec<u8>`.
+
+[source,rust]
+----
+
+pub fn from_file<T: AsRef<Path>>(path: T) \-> Result<Self, std::io::Error> { debug!("Loading wasm file from {:?}", path.as_ref()); let bytes = fs::read(path.as_ref())?; // \... }
+
+----
+
+Now that we have bytes, what are we going to do with them? It makes sense that our `Module` might have a constructor function, a `new()`, that takes bytes. Let's finish this function up like so:
+
+[source,rust]
+----
+
+pub fn from_file<T: AsRef<Path>>(path: T) -> Result<Self, std::io::Error> {
+    debug!("Loading wasm file from {:?}", path.as_ref());
+    let bytes = fs::read(path.as_ref())?;
+    Self::new(&bytes)
+}
+pub fn new(bytes: &[u8]) -> Result<Self, ???> {
+  // ...
+}
+----
+
+But now we have a problem. It's the same type of problem we had in link:./chapter-14-managing-errors.adoc[Chapter 14: Managing Errors]. I know that `new()` will need to return a `Result` because loading any old list of bytes as WebAssembly may fail a thousand ways. None of those ways will be an `io::Error` like the one `from_file` returns. We need a general error that can capture multiple kinds.
+
+Time for a custom error.
+
+Add `thiserror` as a dependency in ``my-lib``'s `Cargo.toml`:
+
+[source,toml]
+----
+
+[dependencies]
+log = "0.4"
+thiserror = "1.0"
+
+----
+
+Make a new file named `error.rs` and start our `Error` enum. We only know that we'll need an error to manage a load failure but that's a fine start.
+
+[source,rust]
+----
+
+use std::path::PathBuf;
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("Could not read file {0}: {1}")]
+    FileNotReadable(PathBuf, String),
+}
+----
+
+Rather than wrap the `io::Error` and be done, we added a custom message and multiple arguments so we can customize the error message.
+
+To use our `Error`, first declare the `error` module in `lib.rs` and import our `Error` with:
+
+[source,rust]
+----
+pub mod error;
+use error::Error;
+----
+
+Now we can change the `Result` type to return our error and use `.map_err()` on the `read()` call to map the `io::Error` to our `Error`:
+
+[source,rust]
+----
+
+pub fn from_file<T: AsRef<Path>>(path: T) \-> Result<Self, Error> { debug!("Loading wasm file from {:?}", path.as_ref()); let bytes = fs::read(path.as_ref()) .map_err(|e| Error::FileNotReadable(path.as_ref().to_path_buf(), e.to_string()))?; Self::new(&bytes) }
+
+----
+
+`.map_err()` is a common way of converting error types, especially when combined with the question mark (`?`) operator. We didn't add an implementation of `From<io::Error>` because we wanted to have more control over our error message. We have to manually map it ourselves before using `?`.
+
+=== Using the `wapc` and `wasmtime-provider` crates
+
+The `wapc` crate is home to the `WapcHost` struct and the `WebAssemblyEngineProvider` trait. `WebAssemblyEngineProvider`s allow us to swap multiple WebAssembly engines in and out easily. We're going to use with the wasmtime engine but you can just as easily use wasm3 or implement a new `WebAssemblyEngineProvider` for any new engine on the scene.
+
+Add `wapc` and `wasmtime-provider` to your `Cargo.toml`.
+
+[source,toml]
+----
+
+[dependencies]
+log = "0.4"
+thiserror = "1.0"
+wapc = "0.10.1"
+wasmtime-provider = "0.0.7"
+----
+
+Before we make a `WapcHost`, we need to initialize the engine.
+
+[source,rust]
+----
+let engine = wasmtime_provider::WasmtimeEngineProvider::new(bytes, None);
+----
+
+The second parameter is our WASI configuration, which we're omitting for now.
+
+The `WapcHost` constructor takes two parameters. One is a ``Box``ed engine. The second is the function that runs when a WebAssembly guest calls back into our host. We don't have any interesting implementations for host calls yet, so we're just going to log it and return an error for now.
+
+[source,rust]
+----
+let host = WapcHost::new(Box::new(engine), |_id, binding, ns, operation, payload| {
+    trace!(
+        "Guest called: binding={}, namespace={}, operation={}, payload={:?}",
+        binding,
+        ns,
+        operation,
+        payload
+    );
+    Err("Not implemented".into())
+})
+----
+
+The constructor returns a `Result` with a new error so we need to add another error kind to our `Error` enum.
+
+[source,rust]
+----
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error(transparent)]
+    WapcError(#[from] wapc::errors::Error),
+    #[error("Could not read file \{0}: \{1}")]
+    FileNotReadable(PathBuf, String),
+}
+
+----
+
+We also need to store the host as part of our `Module` so we can run it later.
+
+[source,rust]
+----
+
+pub struct Module {
+    host: WapcHost,
+}
+----
+
+The final code looks like this:
+
+[source,rust]
+----
+impl Module {
+  pub fn from_file<T: AsRef<Path>>(path: T) -> Result<Self, Error> {
+      debug!("Loading wasm file from {:?}", path.as_ref());
+      let bytes = fs::read(path.as_ref())
+          .map_err(|e| Error::FileNotReadable(path.as_ref().to_path_buf(), e.to_string()))?;
+      Self::new(&bytes)
+  }
+  pub fn new(bytes: &[u8]) -> Result<Self, Error> {
+    let engine = wasmtime_provider::WasmtimeEngineProvider::new(bytes, None);
+
+    let host = WapcHost::new(Box::new(engine), |_id, binding, ns, operation, payload| {
+        trace!(
+            "Guest called: binding={}, namespace={}, operation={}, payload={:?}",
+            binding,
+            ns,
+            operation,
+            payload
+        );
+        Err("Not implemented".into())
+    })?;
+    Ok(Module { host })
+  }
+}
+----
+
+We now have a `from_file` that reads a file and instantiates a new `Module`. If we run `cargo test`, it should pass.
+
+[source,output]
+----
+$ cargo test
+[snipped]
+     Running unittests (target/debug/deps/my_lib-afb9e0792e0763e4)
+
+running 1 test
+test tests::loads_wasm_file ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.84s
+[snipped]
+----
+
+Now we need to actually run our wasm!
+
+=== Calling an operation in WebAssembly
+
+Transferring data in and out of WebAssembly means serializing and deserializing. While waPC does not require any particular serialization format, it's default code generators use MessagePack. That's what we're going to use too but you're free to change it up later.
+
+Add `rmp-serde` to a new `dev-dependencies` section in our `Cargo.toml` so we can use it in our tests.
+
+[source,toml]
+----
+[dev-dependencies]
+rmp-serde = "0.15"
+----
+
+==== Writing our test
+
+Like before, we're going to write a test before our implementation. Our test module contains one exposed operation named `hello` that returns a string like `"Hello, World."` when passed a name like `"World"`.
+
+The test will run that operation and assert the output is what we expect.
+
+[source,rust]
+----
+
+#[cfg(test)]
+mod tests {
+  // ...snipped
+  #[test]
+  fn runs_operation() \-> Result<(), Error> {
+    let module = Module::from_file("./tests/test.wasm")?;
+
+    let bytes = rmp_serde::to_vec("World").unwrap();
+    let payload = module.run("hello", &bytes)?;
+    let unpacked: String = rmp_serde::decode::from_read_ref(&payload).unwrap();
+    assert_eq!(unpacked, "Hello, World.");
+    Ok(())
+  }
+}
+----
+
+Line-by-line, the test above:
+
+* loads our test module on line 6
+* encodes `"World"` into MessagePack bytes on line 8
+* calls an as-of-yet-unimplemented function `.run()` on line 9 with an operation named `hello` and the MessagePacked bytes as the payload.
+* decodes the resulting payload as a `String` on line 10
+* asserts the string is equal to `"Hello, World."`
+
+When you run the test it won't get passed compilation. We don't have a `.run()` method and we need to implement it first.
+
+Our `.run()` function needs to use the `WapcHost` we created to call into WebAssembly and return the result.
+
+You call a guest function from a `WapcHost` by using the `.call()` function with the operation (function) name and the payload as parameters.
+
+[source,rust]
+----
+pub fn run(&self, operation: &str, payload: &[u8]) -> Result<Vec<u8>, Error> {
+    debug!("Invoking {}", operation);
+    let result = self.host.call(operation, payload)?;
+    Ok(result)
+}
+----
+
+If we run our tests again, we'll see our new test passes too!
+
+[source,output]
+----
+$ cargo test
+[snipped]
+     Running unittests (target/debug/deps/my_lib-afb9e0792e0763e4)
+
+running 2 tests
+test tests::runs_operation ... ok
+test tests::loads_wasm_file ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.84s
+[snipped]
+----
+
+=== Improving our CLI
+
+Now that our library loads and runs WebAssembly, we need to expose that with our command line utility.
+
+We have two new arguments that need a place in our `CliOptions`, the operation name and the data to pass.
+
+[source,rust]
+----
+struct CliOptions {
+  /// The WebAssembly file to load.
+  #[structopt(parse(from_os_str))]
+  pub(crate) file_path: PathBuf,
+
+  /// The operation to invoke in the WASM file.
+  #[structopt()]
+  pub(crate) operation: String,
+
+  /// The data to pass to the operation
+  #[structopt()]
+  pub(crate) data: String,
+}
+----
+
+We started by putting everything into our `main()` function but that leaves us little room to manage errors nicely. If we bail from `main()` we get a pretty ugly error message and it looks unprofessional.
+
+The setup below extracts business logic to a `run()` function that produces a `Result` that we can test in `main()`. If we get an error, we print it and then exit the process with a non-zero error code to represent failure.
+
+[source,rust]
+----
+
+fn main() {
+    env_logger::init();
+    debug!("Initialized logger");
+
+....
+let options = CliOptions::from_args();
+
+match run(options) {
+    Ok(output) => {
+        println!("{}", output);
+        info!("Done");
+    }
+    Err(e) => {
+        error!("Module failed to load: {}", e);
+        std::process::exit(1);
+    }
+}; }
+....
+
+fn run(options: CliOptions) \-> anyhow::Result<String>{ //\... }
+
+----
+
+Notice how we're also using `anyhow` here. If you remember from [Chapter 14: Managing Errors](./chapter-14-managing-errors.adoc), `anyhow` is a great crate for when you are the end user. It generalizes over most errors and gives you the ability to get things done faster.
+
+Along with `anyhow`, we'll also need to add `rmp-serde` to our production dependencies because we'll be serializing our argument data before sending it to WebAssembly.
+
+[source,toml]
+----
+
+[dependencies]
+my-lib = { path = "../my-lib" }
+log = "0.4"
+env_logger = "0.9"
+structopt = "0.3"
+rmp-serde = "0.15"
+anyhow = "1.0"
+----
+
+Our `.run()` looks very similar to our test, except the data comes from our `CliOptions` vs hard coded strings.
+
+[source,rust]
+----
+fn run(options: CliOptions) -> anyhow::Result<String> {
+    let module = Module::from_file(&options.file_path)?;
+    info!("Module loaded");
+
+    let bytes = rmp_serde::to_vec(&options.data)?;
+    let result = module.run(&options.operation, &bytes)?;
+    let unpacked: String = rmp_serde::from_read_ref(&result)?;
+
+    Ok(unpacked)
+}
+----
+
+Now we can use our CLI utility to run our test wasm itself!
+
+[source,output]
+----
+» cargo run -p cli -- crates/my-lib/tests/test.wasm hello "Potter"
+[snipped]
+Hello, Potter.
+----
+
+This is a great start to a flexible WebAssembly platform! Congrats! Unfortunately it's limited to only passing and returning strings for now.
+
+We can do much better...
+
+== Additional reading
+
+* https://wapc.io/[`wapc.io`]
+* https://docs.rs/wapc/latest/wapc/[`wapc crate`]
+* https://wasmtime.dev[`wasmtime`]
+* https://docs.rs/anyhow/latest/anyhow/[`anyhow`]
+
+== Wrap-up
+
+This chapter was a big one, I hope you were able to follow along! Developers are using WebAssembly in many different ways. waPC is only one of them. https://rustwasm.github.io/docs/wasm-bindgen/[Wasm-bindgen] is also popular and more tailored to browser usage of WebAssembly. No matter what route you take, you'll inevitably need to forge your own path through hazardous terrain. WebAssembly is very capable, but it hasn't hit mainstream development yet. As such, best practices are hard to come by.
+
+Next up we'll make our CLI more flexible by allowing it to take and receive arbitrary JSON so you can run any sort of (waPC-compliant) WASM module.

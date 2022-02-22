@@ -1,0 +1,134 @@
+= Setting up Visual Studio Code
+
+== Introduction
+
+https://code.visualstudio.com/[Visual Studio Code] dominated the JavaScript ecosystem almost on arrival. If you haven't yet given it a shot, you should. You won't find the breadth of plugins with Rust as you do with JavaScript, but it's growing rapidly. The most important pieces are there with features like:
+
+* code completion/intellisense
+* inline warnings
+* debugger
+* automatic refactor actions
+* automatic documentation tooltips
+* jump to definition, implementation, type, et al
+
+== Core language setup
+
+There are two primary plugins, *rust* (https://marketplace.visualstudio.com/items?itemName=rust-lang.rust[rust-lang.rust]) and *rust-analyzer* (https://marketplace.visualstudio.com/items?itemName=matklad.rust-analyzer[matklad.rust-analyzer]). They promise similar features but I could never get the *rust* plugin to work reliably. *Rust-analyzer* has been great from day one.
+
+WARNING: The *rust* (https://marketplace.visualstudio.com/items?itemName=rust-lang.rust[rust-lang.rust]) and *rust-analyzer* (https://marketplace.visualstudio.com/items?itemName=matklad.rust-analyzer[matklad.rust-analyzer]) plugins don't work well together. If you are exploring both, make sure you disable one to get a fair view of the other.
+
+To install *rust-analyzer*, search for it in the extensions pane or press `Ctrl+Shift+P` then enter:
+
+[source,sh]
+----
+ext install matklad.rust-analyzer
+----
+
+Once you're installed and rust-analyzer has downloaded everything it needs, you should be good to go. Note: you must be in a properly structured Rust project for rust-analyzer to work. You can't open just any `.rs` file and expect full IDE functionality, which brings us to...
+
+=== If things don't feel like they're working...
+
+If you create a new file in a Rust project, e.g. `my_module.rs`, you'll notice that VS Code & rust-analyzer do _something_ but seem to be broken. They do complain about incorrect syntax, but they don't autocomplete anything and don't issue warnings about obviously incorrect code. That's because Rust projects ('crates') rely on a formal structure stemming from the root. That is to say, files can't get checked unless they are imported all the way down to a root source file (e.g. a `main.rs` or `lib.rs`). We'll get into the module system in a later chapter. You can alleviate this now by including your module via a line like `mod my_module`.
+
+=== Notable rust-analyzer settings
+
+You can edit your settings via a UI or as JSON by opening the command palette with `Ctrl+Shift+P`, typing `settings` and selecting which you want. See the https://code.visualstudio.com/docs/getstarted/settings[VS Code documentation] for more info.
+
+image::./images/node-to-rust-vscode-settings.png[VS Code settings in the command palette]
+
+The UI is a great way to explore settings, while JSON is more convenient for rapid editing and sharing. The settings below assume JSON.
+
+==== Additional linting
+
+By default, rust-analyzer runs `cargo check` on save to gather project errors and warnings. `cargo check` essentially just compiles your project looking for errors. If you want more, then you're looking for `clippy`. Clippy is like the ESlint of the Rust universe. Get clippy via `rustup component add clippy` (you may notice you have it already).
+
+You can run `cargo clippy` yourself or set rust-analyzer to run `clippy` on save to get loads of additional warnings and lints. Keep in mind that this takes additional resources and can be a bit slower, but it's worth it. I found `clippy` indispensible when learning Rust. It frequently highlights patterns that could be better replaced with more idiomatic or performant Rust.
+
+[source,json]
+----
+{
+  "rust-analyzer.checkOnSave.command": "clippy"
+}
+----
+
+==== Inlay hints can be disabled
+
+For me, rust-analyzer's inlay hints add too much noise. I turn them off.
+
+image::./images/vs-code-inlay-hints.png[Inlay hints]
+
+It's a matter of preference. Just know that it's configurable if you look at your source and think "whoa, what is going on." The first setting here disables everything, but you can disable individual hints with lines that follow.
+
+[source,json]
+----
+{
+  "rust-analyzer.inlayHints.enable": false,
+  "rust-analyzer.inlayHints.chainingHints": false,
+  "rust-analyzer.inlayHints.parameterHints": false
+}
+----
+
+==== Prompt before downloading updates
+
+Rust-analyzer keeps itself up to date automatically, but I like controlling that behavior in my applications. Sometimes I'm on a flight's WiFi, a mobile hotspot, or some other shaky internet and it's nice to have the control. You can control this by changing the setting below.
+
+[source,json]
+----
+{
+  "rust-analyzer.updates.askBeforeDownload": true
+}
+----
+
+== Additional extensions
+
+=== https://marketplace.visualstudio.com/items?itemName=vadimcn.vscode-lldb[vscode-lldb]
+
+You'll need to install https://marketplace.visualstudio.com/items?itemName=vadimcn.vscode-lldb[vadimcn.vscode-lldb] before you can meaningfully debug Rust applications.
+
+image::./images/vs-code-debugging.png[Debugging]
+
+Install with `Ctrl+Shift+P` then:
+
+[source,sh]
+----
+ext install vadimcn.vscode-lldb
+----
+
+=== https://marketplace.visualstudio.com/items?itemName=bungcip.better-toml[better-toml]
+
+https://marketplace.visualstudio.com/items?itemName=bungcip.better-toml[bungcip.better-toml] adds syntax highlighting for TOML files
+
+Install with `Ctrl+Shift+P` then:
+
+[source,sh]
+----
+ext install bungcip.better-toml
+----
+
+=== https://marketplace.visualstudio.com/items?itemName=serayuzgur.crates[crates]
+
+https://marketplace.visualstudio.com/items?itemName=serayuzgur.crates[serayuzgur.crates] shows you the latest versions of your dependencies and gives you quick access to update them.
+
+image./images/blog/node-to-rust/vs-code-crates.gif[Inline crate versions]
+
+Install with `Ctrl+Shift+P` then:
+
+[source,sh]
+----
+ext install serayuzgur.crates
+----
+
+=== https://marketplace.visualstudio.com/items?itemName=belfz.search-crates-io[search-crates-io]
+
+https://marketplace.visualstudio.com/items?itemName=belfz.search-crates-io[belfz.search-crates-io] attempts to autocomplete dependencies as you write them in your Cargo.toml. I say "attempt" because it doesn't always work, though when it does I appreciate it.
+
+Install with `Ctrl+Shift+P` then:
+
+[source,sh]
+----
+ext install belfz.search-crates-io
+----
+
+== Wrap-up
+
+Programming is more than text and an IDE should be more than a text editor. Your IDE should help you stay in flow as much as possible and put exactly what you need at your fingertips. If you have any other tips for how to make VS Code more Rust-friendly, please share them!

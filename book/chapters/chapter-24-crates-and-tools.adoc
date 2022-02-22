@@ -1,0 +1,75 @@
+= Crates & Valuable Tools
+
+== Introduction
+
+Hopefully you've become comfortable enough with Rust that you want to continue your journey. Rust is hard to get into but it's worth it. I've found that I can build _massive_ projects with a fraction of the unit tests I'm used to writing. Rust handles so many error cases at the compilation stage. Writing Rust is like pair programming with a grumpy old developer who catches _everything_.
+
+Now you need to start building up your suite of core dependencies, the crates you rely on repeatedly and become part of your personal toolbox. These are a few of the crates in mine.
+
+== Crates
+
+=== Data
+
+* https://serde.rs[serde] - Data serialization ecosystem.
+* https://docs.serde.rs/serde_json/[serde_json] - JSON parsing and stringification.
+* https://docs.rs/parking_lot/latest/parking_lot/index.html[parking_lot] - Better Rust `Mutex` and `RwLock`.
+* https://docs.rs/once_cell/latest/once_cell/index.html[once_cell] - When you think you want global variables.
+
+=== Error handling
+
+* https://docs.rs/thiserror/latest/thiserror/[thiserror] - Easy custom errors.
+* https://docs.rs/anyhow/latest/anyhow/[anyhow] - Easy generic errors.
+
+=== Logging
+
+* https://docs.rs/log/latest/log/[log] - Logging facade that abstracts logging usage away from the logger implementation.
+* https://docs.rs/env_logger/latest/env_logger/[env_logger] - Easy console logging controlled by an environment variable.
+* https://docs.rs/test-log/latest/test_log/[test-log] - Get `env_logger`-style output in your tests without worrying about initializing a logger.
+* https://github.com/seanmonstar/pretty-env-logger[pretty-env-logger] - `env_logger`, but _prettier_.
+* https://github.com/tokio-rs/tracing[tracing] - a drop-in replacement for `log` and `env_logger` with expanded capabilities and first-class async support.
+
+=== CLI
+
+* https://docs.rs/structopt/latest/structopt/[structopt] - CLI arguments from configuration.
+* https://docs.rs/clap/latest/clap/[clap] - CLI arguments from code.
+
+=== Async/concurrency
+
+* https://docs.rs/tokio/latest/tokio/[tokio] - Async runtime.
+* https://docs.rs/tokio-stream/latest/tokio_stream/[tokio-stream] - Stream utilities for Tokio.
+* https://docs.rs/async-trait/latest/async_trait/[async-trait] - For when you try to make traits with async methods.
+* https://docs.rs/crossbeam/latest/crossbeam/[crossbeam] - bidirectional communication channels and more.
+
+=== Web
+
+* https://rocket.rs[rocket] - An HTTP server with a great developer experience.
+* https://github.com/seanmonstar/reqwest[reqwest] - an easy-to-use HTTP client.
+* https://github.com/hyperium/hyper[hyper] - a fast and correct HTTP implementation.
+
+=== Functionality you expected in the standard library
+
+* https://docs.rs/rand/latest/rand/[rand] - random number generator and related tools.
+* https://docs.rs/regex/latest/regex/[regex] - Regular expressions.
+* https://docs.rs/base64/latest/base64/[base64] - Base64 implementation.
+* https://docs.rs/http/latest/http/[http] - A general purpose library of common HTTP types.
+
+=== Misc & tools
+
+* https://docs.rs/uuid/latest/uuid/[uuid] - UUID implementation.
+* https://docs.rs/itertools/latest/itertools/[itertools] - Additional iterator functions and macros.
+* https://docs.rs/maplit/latest/maplit/[maplit] - `hashmap!{}` macro like `vec![]`
+* https://docs.rs/cfg-if/latest/cfg_if/[cfg-if] - Macros to simplify mutually exclusive conditional compilation `#[cfg]` attributes.
+* https://github.com/casey/just[`just`] - a better `make`.
+
+== Additional reading
+
+* https://cheats.rs[Rust Language Cheatsheet]
+* https://github.com/rust-unofficial/awesome-rust[Awesome Rust list]
+* https://rust-unofficial.github.io/patterns/[Rust Design Patterns]
+* https://dtolnay.github.io/rust-quiz/[Rust Quiz]
+
+== Wrap-up
+
+During this book I learned that Rust has a curse. Once you learn "The Rust Way" of doing things, you get amnesia. You forget how to program any other way. This curse leads to documentation and examples that naturally skirt around problems 99% of new developers will experience in practice. I found myself unable to replicate several errors that were major roadblocks in my early Rust journey.
+
+The Rust curse is why it's critical that *_you_* are part of the Rust community. *_You_* are the only one that can help. You have a fresh perspective and run into real new-user problems. When you get stuck, reduce your code down to a minimally reproducible example and save it. When you eventually fix it, write about what you changed! If you don't like writing, can't figure something out, or are unsure about your fix, send it to link:mailto:jarrod@vino.dev[me]. I would be honored to take your experience and write about it.

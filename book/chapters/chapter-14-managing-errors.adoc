@@ -1,0 +1,362 @@
+= Managing Errors
+
+== Introduction
+
+So much of Rust's documentation is explanation-heavy vs JavaScript's example-oriented culture. The examples that _do_ exist often involve unrelated concepts that add no value to the topic in question. I still aim to submit a PR to https://doc.rust-lang.org/std/fs/fn.read_to_string.html#examples[fix this example for read_to_string]. That example inexplicably relies on the contents of a file to be a valid socket address to complete successfully. Maybe I expect too much, but I'm old and unlikely to change. I learn from example, from trial and error. I _could_ sit through an explaination about how combustion is an exothermic chemical reaction and that a humans' epidermis starts getting damaged at temperatures above 118 degrees Fahrenheit. _Or_ I could touch a stove once.
+
+I've read a lot of Rust while I learned. I kept trying to figure out the "right way" to do things. Judging from a lot of the code in public projects, I'm not the only one who wasn't able to get comfortable with Rust right away. I've seen many crates I thought *_must_* be examples of good, practical code only to learn that the authors were on the same journey I was. It's difficult to write good Rust when real world code is a mess of people trying to figure things out and documentation amounts to a pile of Lego without instructions.
+
+Error handling is a good example of this problem turned up to 11. The gap from "This is what a `Result` is and how `?` works" to being useful is massive. It's not something you can ignore, either. It's a major hurdle to being productive.
+
+=== Error handling in Rust
+
+The one thing you need to know right now is that you *must* start caring more about errors than you probably ever have before.
+
+When you start a project, the first thing you think about needs to be "How do I manage errors?"
+
+=== Dealing with multiple error types
+
+Let's take a look at the markdown renderer that wouldn't compile from the last chapter.
+
+[source,rust]
+----
+use std::fs::read_to_string;
+
+fn main() -> Result<(), std::io::Error> {
+  let html = render_markdown()?;
+  println!("{}", html);
+  Ok(())
+}
+
+fn render_markdown() -> Result<String, std::io::Error> {
+  let file = std::env::var("MARKDOWN")?;
+  let source = read_to_string(file)?;
+  Ok(markdown::to_html(&source))
+}
+----
+
+The problem with this code stems from mismatched types. We return a `Result` with an error type of `io::Error` but we're using `?` in two places, one of which returns a different kind of error. `read_to_string` returns a `Result<String, io::Error>` which is great, but `env::var()` returns a `Result<String, env::VarError>`.
+
+We need a general type that matches multiple errors. If you've been following along day-by-day, then you know this means one of two things: traits or enums.
+
+==== Option 1: `Box<dyn Error>`
+
+NOTE: This option is a good learning exercise. It's not code you should write in any meaningful project.
+
+
+Boxing your errors relies on those errors implementing the https://doc.rust-lang.org/std/error/trait.Error.html[`Error` trait].
+
+===== What's a `Box`?
+
+Rust must know the size of everything at compile time. Since a `dyn [trait]` value has lost its concrete type (see: link:./chapter-10-traits.adoc[Chapter 10: From Mixins to Traits]), Rust can't know its size. It's "unsized." A reference, on the other hand, does have a concrete size. It's the size of a pointer. On a 32-bit machine its 32 bits. A 64-bit machine, it's 64 bits. I know, lin./images/blog/whoa.gif[whoa].
+
+But we can't simply return a reference https://www.merriam-webster.com/dictionary/willy-nilly[willy nilly]. Referenced data has to live somewhere. If it lives in (is owned by) our function then Rust won't let us return a reference at all. The value's lifetime will be too short. We've dealt with lifetimes _all over_ this guide, they've just been https://doc.rust-lang.org/nomicon/lifetime-elision.html[hidden]. We haven't had to tackle them directly but we're getting closer.
+
+Think of `Box`-ing something as taking a value, putting it somewhere where it'll live for a long time, and holding a pointer to that location. It's how we get around wanting or needing to return a reference for a value that we would normally drop.
+
+The code to make this work is below:
+
+[source,rust]
+----
+use std::{error::Error, fs::read_to_string};
+
+fn main() -> Result<(), Box<dyn Error>> {
+  let html = render_markdown()?;
+  println!("{}", html);
+  Ok(())
+}
+
+fn render_markdown() -> Result<String, Box<dyn Error>> {
+  let file = std::env::var("MARKDOWN")?;
+  let source = read_to_string(file)?;
+  Ok(markdown::to_html(&source))
+}
+----
+
+This often works, but if you remember from link:./chapter-13-result-and-option.adoc[Chapter 13: Results & Options], the `Result` type doesn't constrain the error's type. You will eventually encounter errors that do not implement the `Error` trait and this method falls flat.
+
+==== Option 2: Create your own custom Error type
+
+Using `dyn [trait]` crosses the `dyn` barrier which results in lost type information (link:/blog/node-to-rust-day-10-traits/#impl-vs-dyn[as you remember]). It's a handy way of getting code running but it's not a longterm solution.
+
+Creating your own error type gives you more control over what you want to expose externally or handle explicitly. Error types can be structs or enums. Custom errors that account for multiple errors will frequently be an enum or involve an enum internally (often called `ErrorKind`).
+
+[source,rust]
+----
+enum MyError {}
+----
+
+A good Rust citizen produces errors that implement the `Error` trait, which you can start by writing:
+
+[source,rust]
+----
+impl std::error::Error for MyError {}
+----
+
+Have you committed VS Code's https://code.visualstudio.com/docs/editor/refactoring#_code-actions-quick-fixes-and-refactorings[`Quick fix`] we talked about it in link:./chapter-9-structs-and-behavior.adoc[Chapter 9] to muscle memory yet?
+
+image::./images/vs-code-impl-error.png[VS Code quick fix menu on impl Error for MyError]
+
+If so then that red squiggly line might have triggered you to go ahead and run the _Implement default members_ action.
+
+image::./images/vs-code-impl-error2.png[VS Code auto-filled Error implementation]
+
+Yikes. Good news, though: you can delete it. We don't need it. Those defaults are fine. The red squiggly line was actually because the `Error` trait has https://doc.rust-lang.org/beta/src/std/error.rs.html#55[two supertraits], `Display` and `Debug`, that need to be implemented.
+
+NOTE: A supertrait refers to a trait that is a "superset" of another trait. Supertraits confused me at first for two reasons.
+
+. _Super [anything]_ invokes imagery of something out of the ordinary, https://www.google.com/search?q=super+hero&tbm=isch&ved=2ahUKEwiM1YKGgeT0AhXnA1kFHW85C6sQ2-cCegQIABAA&oq=super+hero&gs_lcp=CgNpbWcQAzIICAAQgAQQsQMyCAgAEIAEELEDMgUIABCABDIICAAQgAQQsQMyCAgAEIAEELEDMgUIABCABDIFCAAQgAQyBQgAEIAEMgUIABCABDIFCAAQgAQ6BAgAEEM6BwgAELEDEENQoAVY7gpguQ9oAHAAeACAATSIAfoBkgEBNpgBAKABAaoBC2d3cy13aXotaW1nwAEB&sclient=img&ei=Ne64YczmAeeH5NoP7_Ks2Ao&bih=966&biw=1885&hl=en[something special]. They're not.
+. In programming, `super` is frequently coupled with inheritance which Rust tells you time and time again it doesn't have.
+
+The important thing to remember is that a supertrait is an additional, required trait. You must implement the supertraits in addition to the desired trait. We declare a trait with supertraits when we want to be able to use the supertrait's methods from within our trait.
+
+
+Implementing `Debug` and `Display` is straightforward and similar to what we've seen before:
+
+[source,rust]
+----
+#[derive(Debug)]
+enum MyError {}
+
+impl std::error::Error for MyError {}
+
+impl std::fmt::Display for MyError {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "Error!") // We have nothing useful to display yet.
+  }
+}
+----
+
+NOTE: In this guide I frequently prefix items with their full namespace, i.e. `std::fmt::Display` vs `Display`. That's not necessary. I do it as a compromise between clarity and terseness.
+
+
+After changing all of our ``Result``s to return `MyError`, our code now looks like this:
+
+[source,rust]
+----
+use std::fs::read_to_string;
+
+fn main() -> Result<(), MyError> {
+  let html = render_markdown()?;
+  println!("{}", html);
+  Ok(())
+}
+
+fn render_markdown() -> Result<String, MyError> {
+  let file = std::env::var("MARKDOWN")?;
+  let source = read_to_string(file)?;
+  Ok(markdown::to_html(&source))
+}
+
+#[derive(Debug)]
+enum MyError {}
+
+impl std::error::Error for MyError {}
+
+impl std::fmt::Display for MyError {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "Error!")
+  }
+}
+----
+
+This code doesn't yet compile though. Rust outputs two errors, both of which are the same: `? coudn't convert the error to `MyError``
+
+[source,output]
+----
+[snipped]
+error[E0277]: `?` couldn't convert the error to `MyError`
+   --> crates/day-14/custom-error-type/src/main.rs:10:39
+    |
+9   | fn render_markdown() -> Result<String, MyError> {
+    |                         ----------------------- expected `MyError` because of this
+10  |   let file = std::env::var("MARKDOWN")?;
+    |                                       ^ the trait `From<VarError>` is not implemented for `MyError`
+    |
+    = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+    = note: required because of the requirements on the impl of `FromResidual<Result<Infallible, VarError>>` for `Result<String, MyError>`
+note: required by `from_residual`
+[snipped]
+----
+
+Just because we have a custom error type doesn't mean that Rust knows how to convert other errors into it. The helper text shows us just what we need to do, though. We need to implement `From<env::VarError>` and `From<io::Error>` for `MyError`.
+
+==== The `From`, `Into`, `TryFrom`, and `TryInto` traits
+
+The `From`, `Into`, `TryFrom`, and `TryInto` traits are the root of many magical conversions. Whenever you see `.into()`, you're (usually) seeing the result of implementing one or several of these traits.
+
+Implementing `From` gives you the inverse `Into` for free. `TryFrom` does the same for `TryInto`. The `Try*` traits are for conversions that can fail. They return a `Result`.
+
+The implementations for `MyError` are below. Notice that we're adding variants to `MyError` to denote the error kind and also that our `IOError` variant wraps the original `std::io::Error`.
+
+[source,rust]
+----
+#[derive(Debug)]
+enum MyError {
+  EnvironmentVariableNotFound,
+  IOError(std::io::Error),
+}
+
+impl From<std::env::VarError> for MyError {
+  fn from(_: std::env::VarError) -> Self {
+    Self::EnvironmentVariableNotFound
+  }
+}
+
+impl From<std::io::Error> for MyError {
+  fn from(value: std::io::Error) -> Self {
+    Self::IOError(value)
+  }
+}
+----
+
+The complete implementation is below. Take note that we fleshed out the `Display` implementation now that we have variants to distinguish from:
+
+[source,rust]
+----
+use std::fs::read_to_string;
+
+fn main() -> Result<(), MyError> {
+  let html = render_markdown()?;
+  println!("{}", html);
+  Ok(())
+}
+
+fn render_markdown() -> Result<String, MyError> {
+  let file = std::env::var("MARKDOWN")?;
+  let source = read_to_string(file)?;
+  Ok(markdown::to_html(&source))
+}
+
+#[derive(Debug)]
+enum MyError {
+  EnvironmentVariableNotFound,
+  IOError(std::io::Error),
+}
+
+impl From<std::env::VarError> for MyError {
+  fn from(_: std::env::VarError) -> Self {
+    Self::EnvironmentVariableNotFound
+  }
+}
+
+impl From<std::io::Error> for MyError {
+  fn from(value: std::io::Error) -> Self {
+    Self::IOError(value)
+  }
+}
+
+impl std::error::Error for MyError {}
+
+impl std::fmt::Display for MyError {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      MyError::EnvironmentVariableNotFound => write!(f, "Environment variable not found"),
+      MyError::IOError(err) => write!(f, "IO Error: {}", err.to_string()),
+    }
+  }
+}
+----
+
+It's a lot of code just to use a question mark that's supposed to make our lives easier...
+
+==== Option 3: Use a crate
+
+Every Rust programmer deals with errors and there's loads of precedent out there. There's no need to reinvent the wheel at this stage of your Rust journey. It's much easier to leave it to a crate.
+
+===== `thiserror`
+
+https://docs.rs/thiserror/latest/thiserror/[`thiserror`] (https://crates.io/crates/thiserror[crates.io]) gives you all of Option 2 with less headache and more functionality. The code below is a complete implementation that mimics the behavior in our custom error example.
+
+[source,rust]
+----
+use std::fs::read_to_string;
+
+fn main() -> Result<(), MyError> {
+  let html = render_markdown()?;
+  println!("{}", html);
+  Ok(())
+}
+
+fn render_markdown() -> Result<String, MyError> {
+  let file = std::env::var("MARKDOWN")?;
+  let source = read_to_string(file)?;
+  Ok(markdown::to_html(&source))
+}
+
+#[derive(thiserror::Error, Debug)]
+enum MyError {
+  #[error("Environment variable not found")]
+  EnvironmentVariableNotFound(#[from] std::env::VarError),
+  #[error(transparent)]
+  IOError(#[from] std::io::Error),
+}
+----
+
+===== `error-chain`
+
+NOTE: `error-chain` is no longer maintained and is marked as deprecated. It's still heavily relied upon and works fine the cases where I've used it. It makes basic error handling so simple that I think it is still worth mentioning. Getting passed the early frustration with error handling is more important than finding the perfect crate right away.
+
+
+Another great option is https://docs.rs/error-chain/0.12.4/error_chain/index.html[error-chain] (https://crates.io/crates/error-chain[crates.io]). `error-chain` gives you a lot more options and makes creating errors as easy as:
+
+[source,rust]
+----
+error_chain::error_chain!{}
+----
+
+Really, that's it. You get an `Error` struct, an `ErrorKind` enum, a custom `Result` type aliased to return your `Error`, and more.
+
+Below is a sample implementation for our example program.
+
+[source,rust]
+----
+use std::fs::read_to_string;
+
+error_chain::error_chain! {
+  foreign_links {
+    EnvironmentVariableNotFound(::std::env::VarError);
+    IOError(::std::io::Error);
+  }
+}
+
+fn main() -> Result<()> {
+  let html = render_markdown()?;
+  println!("{}", html);
+  Ok(())
+}
+
+fn render_markdown() -> Result<String> {
+  let file = std::env::var("MARKDOWN")?;
+  let source = read_to_string(file)?;
+  Ok(markdown::to_html(&source))
+}
+----
+
+===== Honorable mention: `anyhow`
+
+The author of https://github.com/dtolnay/[`thiserror`] also publishes another popular error crate called https://github.com/dtolnay/anyhow[`anyhow`]. His words on the difference between `anyhow` and `thiserror`:
+
+NOTE: Use thiserror if you care about designing your own dedicated error type(s) so that the caller receives exactly the information that you choose in the event of failure. This most often applies to library-like code. Use Anyhow if you don't care what error type your functions return, you just want it to be easy. This is common in application-like code._
+
+I've used `anyhow` frequently and agree with the distinction above. `anyhow` is great for building command line utilities and other projects that won't be used like a library.
+
+=== Additional reading
+
+* https://doc.rust-lang.org/book/ch09-02-recoverable-errors-with-result.html[The Rust Book: ch 9.02 - Recoverable Errors with Result]
+* https://doc.rust-lang.org/rust-by-example/error/multiple_error_types.html[Rust by Example: Multiple Error Types]
+
+==== Other crates
+
+There are many other popular crates that make error handling less cumbersome. I haven't used any of these in large projects and can't give an opinion.
+
+* https://docs.rs/snafu/0.6.10/snafu/index.html[Snafu] (https://crates.io/crates/snafu[crates.io].)
+* https://docs.rs/quick-error/latest/quick_error/[quick-error] (https://crates.io/crates/quick-error[crates.io])
+* https://docs.rs/failure/latest/failure/[failure] (https://crates.io/crates/failure[crates.io])
+* https://docs.rs/err-derive/0.3.0/err_derive/[err-derive] (https://crates.io/crates/err-derive[crates.io])
+
+== Wrap-up
+
+Rust makes errors a priority. Once you start respecting them the way Rust forces you too, you'll understand why. Robust error handling is one of the most valuable things you can take back to your JavaScript projects. You'll learn how to isolate code that can fail and generate more meaningful error messages and fallbacks.
+
+You can't go wrong with using `thiserror` or `error-chain` for libraries. I use `anyhow` in my tests and for CLI projects frequently. They are all quality options and will turn error handling into one of the most frustrating parts of Rust into one of the things you love most.

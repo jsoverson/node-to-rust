@@ -1,0 +1,295 @@
+= Borrowing & Ownership
+
+== Introduction
+
+Before we get into strings, we need to talk about ownership. Ownership in Rust is where things start to get complicated. Not because it's hard to understand, but because Rust's rules force you to rethink logic and structure that would work fine elsewhere.
+
+Rust gained popularity and respect because it promised memory safety without a garbage collector. Languages like JavaScript, Go, and many others use garbage collection to manage memory. They keep track of all references to objects (borrowed data) and only release memory when the reference count drops to zero. Garbage collectors make life easy for developers at the expense of resources and performance. Often times it's good enough. When it's not, you're usually out of luck. Troubleshooting and optimizing garbage collection is its own brand of dark magic. When you abide by Rust's rules, you'll achieve memory safety without the overhead of a garbage collector. You get all those resources back for free.
+
+Memory safety is more than just making sure your programs don't crash. It closes the door to a whole class of security vulnerabilities. You've heard of SQL injection, right? If you haven't, it's a vulnerability that stems from database clients that create SQL statements by concatenating https://bobby-tables.com[unsanitized user input]. Adversaries exploit this vulnerability by passing cleverly crafted input that alters the final query and runs new instructions. Luckily, the attack surface is manageable and it's 100% preventable. Even still, it remains the most common vulnerability in web applications today. Memory unsafe code is like having harder to find SQL injection vulnerabilities that can pop up anywhere. Memory safety bugs account for the majority of serious vulnerabilities. Eliminating them altogether with _no_ performance impact is an attractive notion.
+
+=== Required reading
+
+This guide won't duplicate existing content when possible. It's meant to clarify concepts that you have already encountered. Check out these chapters in the Rust book if you're skimming here and aren't following along.
+
+* https://doc.rust-lang.org/book/ch03-00-common-programming-concepts.html[Rust book Ch.3: Common Programming Concepts]
+* https://doc.rust-lang.org/book/ch04-00-understanding-ownership.html[Rust book Ch.4: Understanding Ownership]
+* https://doc.rust-lang.org/rust-by-example/variable_bindings.html[Rust by Example: Variable Bindings]
+* https://doc.rust-lang.org/rust-by-example/primitives.html[Rust by Example: Primitives]
+* https://doc.rust-lang.org/rust-by-example/flow_control.html[Rust by Example: Flow control]
+* https://doc.rust-lang.org/rust-by-example/fn.html[Rust by Example: Functions]
+
+=== Quick sidebar
+
+==== Variable assignments & mutability
+
+JavaScript assignments fall into two camps, `let` for variables that can be reassigned and `const` for those that can't. While Rust also has `let` and `const`, ignore `const` for now.
+
+Where you want `const` in JavaScript, you want `let` in Rust. Where you'd use `let` in JavaScript, you'd use `let mut` in Rust. The keyword `mut` is required to declare a variable as mutable (changeable). That's right, everything in Rust is immutable (unchangeable) by default. This is a good thing, I promise you. You'll wish this was true in JavaScript by the time you're done here.
+
+In JavaScript you'd write:
+
+[source,js]
+----
+let one = 1;
+console.log({ one });
+one = 3;
+console.log({ one });
+----
+
+The Rust counterpart is:
+
+[source,rust]
+----
+fn main() {
+  let mut mutable = 1;
+  println!("{}", mutable);
+  mutable = 3;
+  println!("{}", mutable);
+}
+----
+
+One major difference with Rust is that you can only reassign a variable with a value of the same type. This won't work:
+
+[source,rust]
+----
+fn main() {
+    let mut mutable = 1;
+    println!("{}", mutable);
+
+    mutable = "3"; // Notice this isn't a number.
+
+    println!("{}", mutable);
+}
+----
+
+That said, you _can_ assign a different type to a variable with the same name by using another `let` statement
+
+[source,rust]
+----
+fn main() {
+    let myvar = 1;
+    println!("{}", myvar);
+    let myvar = "3";
+    println!("{}", myvar);
+}
+----
+
+=== Rust's Borrow Checker
+
+Rust guarantees memory safety by enforcing some basic -- albeit strict -- rules for how you pass data around, how you "borrow" data and who "owns" data.
+
+==== Rule #1: Ownership
+
+When you pass a value, the calling code can no longer access that data. It's given up ownership. Take a look at the code below and the error that occurs when you try to run it
+
+[source,rust]
+----
+use std::{collections::HashMap, fs::read_to_string};
+
+fn main() {
+    let source = read_to_string("./README.md").unwrap();
+    let mut files = HashMap::new();
+    files.insert("README", source);
+    files.insert("README2", source);
+}
+----
+
+IMPORTANT: You'll see `.unwrap()` a lot in example code but it's not something you should use frequently in production code. We'll go over it in the Result & Option section but the gist is: `.unwrap()` assumes a successful operation and panics (dies) otherwise. It's OK in examples. It's not OK in your applications unless you are sure an operation can't fail.
+
+In your IDE or when you try to run this, notice the error message `use of moved value: source`. You'll see that a lot and it's important to embed its meaning in your brain now.
+
+[source,output]
+----
+error[E0382]: use of moved value: `source`
+  |
+4 |     let source = read_to_string("./README.md").unwrap();
+  |         ------ move occurs because `source` has type `String`, which does not implement the `Copy` trait
+5 |     let mut files = HashMap::new();
+6 |     files.insert("README", source);
+  |                            ------ value moved here
+7 |     files.insert("README2", source);
+  |                             ^^^^^^ value used here after move
+
+For more information about this error, try `rustc --explain E0382`.
+----
+
+When we inserted `source` into the HashMap the first time, we gave up ownership. If we want to make the above code compile, we have to clone `source` the first time we give it away.
+
+[source,rust]
+----
+use std::{collections::HashMap, fs::read_to_string};
+
+fn main() {
+    let source = read_to_string("./README.md").unwrap();
+    let mut files = HashMap::new();
+    files.insert("README", source.clone());
+    files.insert("README2", source);
+}
+----
+
+NOTE: You'll see notes in these error messages when your value "does not implement the `Copy` trait". We'll get to traits later but the gist of `Copy` vs `Clone` is that `Copy` is for data that can be reliably, trivially copied. Rust will copy those values automatically for you. `Clone` is for potentially expensive copies and you have to do that yourself.
+
+==== Rule #2: Borrowing
+
+When borrowing data -- when you take a reference to data -- you can do it immutably an infinite number of times or mutably _only once_. Typically, you'll take a reference by prefixing a value with an ampersand (`&`). This gives you the ability to pass potentially large chunks of data around without cloning them every time.
+
+[source,rust]
+----
+use std::{collections::HashMap, fs::read_to_string};
+
+fn main() {
+    let source = read_to_string("./README.md").unwrap();
+    let mut files = HashMap::new();
+    files.insert("README", source.clone());
+    files.insert("README2", source);
+
+    let files_ref = &files;
+    let files_ref2 = &files;
+
+    print_borrowed_map(files_ref);
+    print_borrowed_map(files_ref2);
+}
+
+fn print_borrowed_map(map: &HashMap<&str, String>) {
+    println!("{:?}", map)
+}
+----
+
+NOTE: The `{:?}` syntax in `println!` is the `Debug` formatter. It's a handy way of outputting data that doesn't necessarily have a human-readable format.
+
+If we needed to take a mutable reference of our map, we would write it as `let files_ref = &mut files;`.
+
+[source,rust]
+----
+use std::{collections::HashMap, fs::read_to_string};
+
+fn main() {
+    let source = read_to_string("./README.md").unwrap();
+    let mut files = HashMap::new();
+    files.insert("README", source.clone());
+    files.insert("README2", source);
+
+    let files_ref = &mut files;
+    let files_ref2 = &mut files;
+
+    needs_mutable_ref(files_ref);
+    needs_mutable_ref(files_ref2);
+}
+
+fn needs_mutable_ref(map: &mut HashMap<&str, String>) {}
+----
+
+You'll encounter the following error when you compile the above code.
+
+[source,output]
+----
+error[E0499]: cannot borrow `files` as mutable more than once at a time
+   |
+9  |     let files_ref = &mut files;
+   |                     ---------- first mutable borrow occurs here
+10 |     let files_ref2 = &mut files;
+   |                      ^^^^^^^^^^ second mutable borrow occurs here
+11 |
+12 |     needs_mutable_ref(files_ref);
+   |                       --------- first borrow later used here
+
+For more information about this error, try `rustc --explain E0499`.
+----
+
+The Rust compiler is smart and getting smarter every release, though. If you reorder your borrows so that it can see that one reference will be finished before you use the other, you'll be OK.
+
+[source,rust]
+----
+use std::{collections::HashMap, fs::read_to_string};
+
+fn main() {
+    let source = read_to_string("./README.md").unwrap();
+    let mut files = HashMap::new();
+    files.insert("README", source.clone());
+    files.insert("README2", source);
+
+    let files_ref = &mut files;
+
+    needs_mutable_ref(files_ref);
+
+    let files_ref2 = &mut files;
+
+    needs_mutable_ref(files_ref2);
+}
+
+fn needs_mutable_ref(map: &mut HashMap<&str, String>) {}
+----
+
+As you're starting with Rust, you may find many of your errors can be solved by just switching around around the order of your code. Give it a shot before ripping your hair out.
+
+=== References support session
+
+If you've spent most of your life in JavaScript or had horrible experiences with languages like C, you may be thinking: "References? Whatever. I don't like references and I don't need references." I need to let you in on a secret. You use references literally _all the time_ in JavaScript. Every object is a reference. That's how you can pass an object to a function, edit a property, and have that change be reflected after the function finishes. Take this code for example
+
+[source,js]
+----
+function actOnString(string) {
+  string += " What a nice day.";
+  console.log(`String in function: ${string}`);
+}
+
+const stringValue = "Hello!";
+console.log(`String before function: ${stringValue}`);
+actOnString(stringValue);
+console.log(`String after function: ${stringValue}\n`);
+
+function actOnNumber(number) {
+  number++;
+  console.log(`Number in function: ${number}`);
+}
+
+const numberValue = 2000;
+console.log(`Number before function: ${numberValue}`);
+actOnNumber(numberValue);
+console.log(`Number after function: ${numberValue}\n`);
+
+function actOnObject(object) {
+  object.firstName = "Samuel";
+  object.lastName = "Clemens";
+  console.log(`Object in function: ${objectValue}`);
+}
+
+const objectValue = {
+  firstName: "Jane",
+  lastName: "Doe",
+};
+objectValue.toString = function () {
+  return `${this.firstName} ${this.lastName}`;
+};
+console.log(`Object before function: ${objectValue}`);
+actOnObject(objectValue);
+console.log(`Object after function: ${objectValue}`);
+----
+
+When you run it you get:
+
+----
+String before function: Hello!
+String in function: Hello! What a nice day.
+String after function: Hello!
+
+Number before function: 2000
+Number in function: 2001
+Number after function: 2000
+
+Object before function: Jane Doe
+Object in function: Samuel Clemens
+Object after function: Samuel Clemens
+----
+
+_Not_ using references would be like making a deep copy of every `Object` every time you pass it to any function. That would be ridiculous, right? Of course it would.
+
+NOTE: Programmers coming _to_ JavaScript look at this behavior as their own "WTF." They're the type of people who interview candidates with questions like "Is JavaScript a pass by value or pass by reference language" while JavaScript programmers hear that question and think "Why are you talking about references and not asking me about React?"
+ +
+ +
+Interview tip: the answer is "JavaScript is pass by value, except for all ``Object``s where the value is a reference."
+
+== Wrap-up
+
+Ownership is a core, recurring topic in Rust. We needed to dive into it at a high level before we deal with Strings link:./chapter-6-strings-part1.adoc[Chapter 6: Strings, part 1].

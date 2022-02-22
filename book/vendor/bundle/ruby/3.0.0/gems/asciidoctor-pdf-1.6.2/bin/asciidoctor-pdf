@@ -1,0 +1,29 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+if File.file?(asciidoctor_pdf = (File.expand_path '../../lib/asciidoctor/pdf.rb', __FILE__))
+  require asciidoctor_pdf
+else
+  require 'asciidoctor/pdf'
+end
+require 'asciidoctor/cli'
+
+options = Asciidoctor::Cli::Options.new backend: 'pdf', header_footer: true
+
+# FIXME provide an API in Asciidoctor for sub-components to print version information
+unless ARGV != ['-v'] && (ARGV & ['-V', '--version']).empty?
+  $stdout.write %(Asciidoctor PDF #{Asciidoctor::PDF::VERSION} using )
+  options.print_version
+  exit 0
+end
+
+# FIXME This is a really bizarre API. Please make me simpler.
+case (result = options.parse! ARGV)
+when Integer
+  exit result
+else
+  invoker = Asciidoctor::Cli::Invoker.new options
+  GC.start
+  invoker.invoke!
+  exit invoker.code
+end

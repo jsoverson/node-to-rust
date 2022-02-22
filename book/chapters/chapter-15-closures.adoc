@@ -1,0 +1,329 @@
+= Closures
+
+== Introduction
+
+Closures are a natural part of JavaScript. It's hard to imagine what programming is like without them. Luckily, you don't have to. The behavior of Rust's closures is similar enough to JavaScript's that you will be able to retain most of what you're comfortable with.
+
+NOTE: Closures are defined as functions that retain references to (enclose) its surrounding state. I use the term "closure" here as a general term to mean an anonymous function, regardless of whether or not it references external variables.
+
+
+== Closure syntax comparison
+
+NOTE: If you haven't been following along with the code repository, now is a good time to start. This day's code is available in Chapter 15 of the https://github.com/vinodotdev/node-to-rust/[project on github].
+
+
+This section maps JavaScript/TypeScript closures to the equivalent Rust syntax without much explanation. If you get lost, please reach out. Your perspective on what is confusing will help make this book better. Don't hesitate to submit issues or pull requests!
+
+=== Basic closure syntax
+
+This closure prints `Hi! I'm in a closure`.
+
+[source,ts]
+----
+
+let closure = () \=> {
+  console.log("Hi! I'm in a closure");
+};
+closure();
+
+----
+
+[source,rust]
+----
+
+let closure = || {
+  println!("Hi! I'm in a closure");
+};
+closure();
+----
+
+[source,output]
+----
+Hi! I'm in a closure
+----
+
+NOTE: Rust uses pipes instead of parentheses for arguments and does not have a separator between the arguments and the body.
+
+
+=== Closures with a single expression body
+
+These closures show how you can omit the curly braces `{}` for closures that consist of a single expression.
+
+[source,ts]
+----
+
+let double = (num: number) \=> num + num;
+let num = 4;
+console.log(`+${num} + ${num} = ${double(num)}+`);
+
+----
+
+[source,rust]
+----
+
+let double = |num: i64| num + num;
+let num = 4;
+println!("{} + {} = {}", num, num, double(num));
+----
+
+[source,output]
+----
+4 + 4 = 8
+----
+
+NOTE: Both JavaScript and Rust can omit the curly braces if the body consists of a single expression.
+
+
+=== Closures referencing external variables
+
+A proper closure references variables from its parent's scope. That's no problem in Rust.
+
+[source,ts]
+----
+
+let name = "Rebecca";
+closure = () \=> {
+  console.log(`+Hi, ${name}.+`);
+};
+closure();
+
+----
+
+[source,rust]
+----
+
+let name = "Rebecca";
+let closure = || {
+  println!("Hi, {}.", name);
+};
+closure();
+----
+
+[source,output]
+----
+Hi, Rebecca.
+----
+
+NOTE: Mutable variables need a mutable closure! The state of your closure is part of the closure. If you mutate a variable in a closure then the closure itself must be made mutable.
+
+These closures increment a counter when executed.
+
+[source,ts]
+----
+
+let counter = 0;
+closure = () \=> {
+  counter += 1;
+  console.log(`+This closure has a counter. I've been run ${counter} times.+`);
+};
+closure();
+closure();
+closure();
+console.log(`+The closure was called a total of ${counter} times+`);
+
+----
+
+[source,rust]
+----
+
+let mut counter = 0;
+
+let mut closure = || {
+  counter += 1;
+  println!(
+    "This closure has a counter. I've been run {} times.",
+    counter
+  );
+};
+closure();
+closure();
+closure();
+println!("The closure was called a total of {} times", counter);
+----
+
+[source,output]
+----
+This closure has a counter. I've been run 1 times.
+This closure has a counter. I've been run 2 times.
+This closure has a counter. I've been run 3 times.
+The closure was called a total of 3 times
+----
+
+
+=== Returning a closure
+
+Generating closures dynamically is straightforward once you get over the nuances in the different traits. The make-adder functions take in an addend and generate a closure that takes in a second number and sums the enclosed value with the passed value.
+
+[source,ts]
+----
+
+function makeAdder(left: number): (left: number) \=> number {
+  return (right: number) \=> {
+    console.log(`+${left} + ${right} is ${left + right}+`);
+    return left + right;
+  };
+}
+
+let plusTwo = makeAdder(2);
+plusTwo(23);
+
+----
+
+[source,rust]
+----
+
+fn make_adder(left: i32) -> impl Fn(i32) -> i32 {
+  move |right: i32| {
+    println!("{} + {} is {}", left, right, left + right);
+    left + right
+  }
+}
+
+let plus_two = make_adder(2);
+plus_two(23);
+----
+
+[source,output]
+----
+2 + 23 is 25
+----
+
+==== The `Fn`, `FnMut`, and `FnOnce` traits
+
+Functions come in three flavors.
+
+* `Fn`: a function that immutably borrows any variables it closes over.
+* `FnMut`: a function that mutably borrows variables it closes over.
+* `FnOnce`: a function that consumes (loses ownership of) of its values and thus can only be run once, e.g.
+
+[source,rust]
+----
+let name = "Dwayne".to_owned();
+let consuming_closure = || name.into_bytes();
+let bytes = consuming_closure();
+let bytes = consuming_closure(); // This is a compilation error
+----
+
+==== The `move` keyword
+
+The move keyword tells Rust that the following block or closure takes ownership of any variables it references. It's necessary above because we're returning a closure that references `left` which would normally be dropped when the function ends. When we `move` it into the closure, we can return the closure without issue.
+
+=== Composing functions
+
+The `compose` function takes two functions and returns a closure that runs both and pipes the output of one into the other.
+
+Each input closure takes one argument of the generic type `T` and returns a value also of type `T`. The first of the two closures is the `plus_two` closure from above. The second closure, `times_two`, multiplies its input by two.
+
+The generated closure, `double_plus_two`, composes the original two into one.
+
+[source,ts]
+----
+
+function compose<T>(f: (left: T) \=> T, g: (left: T) \=> T): (left: T) \=> T { return (right: T) \=> f(g(right)); }
+
+let plusTwo = makeAdder(2); // ← makeAdder from above
+let timesTwo = (i: number) \=> i * 2;
+let doublePlusTwo = compose(plusTwo, timesTwo);
+console.log(`+${10} * 2 + 2 = ${doublePlusTwo(10)}+`);
+
+----
+
+[source,rust]
+----
+
+fn compose<T>(f: impl Fn(T) -> T, g: impl Fn(T) -> T) -> impl Fn(T) -> T {
+  move |i: T| f(g(i))
+}
+
+let plus_two = make_adder(2);  // ← make_adder from above
+let times_two = |i: i32| i * 2;
+let double_plus_two = compose(plus_two, times_two);
+println!("{} * 2 + 2 = {}", 10, double_plus_two(10));
+----
+
+[source,output]
+----
+10 * 2 + 2 = 22
+----
+
+=== Regular function references
+
+This section shows how you can treat any function as a first-class citizen in Rust.
+
+[source,ts]
+----
+
+function regularFunction() {
+  console.log("I'm a regular function");
+}
+
+let fnRef = regularFunction;
+fnRef();
+
+----
+
+[source,rust]
+----
+
+fn regular_function() {
+  println!("I'm a regular function");
+}
+
+let fn_ref = regular_function;
+fn_ref();
+----
+
+[source,output]
+----
+I'm a regular function
+----
+
+=== Storing closures in a struct
+
+Storing functions can be a little trickier due to the different `Fn*` traits and the `dyn [trait]` behavior.
+
+This code creates a class or struct that you instantiate with a closure. You can then call `.run()` from the resulting instance to execute the stored closure.
+
+[source,ts]
+----
+
+class DynamicBehavior<T>{ closure: (num: T) \=> T; constructor(closure: (num: T) \=> T) { this.closure = closure; } run(arg: T): T { return this.closure(arg); } }
+
+let square = new DynamicBehavior((num: number) \=> num * num);
+console.log(`+${5} squared is ${square.run(5)}+`);
+
+----
+
+[source,rust]
+----
+
+struct DynamicBehavior<T> {
+  closure: Box<dyn Fn(T) -> T>,
+}
+
+impl<T> DynamicBehavior<T> {
+  fn new(closure: Box<dyn Fn(T) -> T>) -> Self {
+    Self { closure }
+  }
+  fn run(&self, arg: T) -> T {
+    (self.closure)(arg)
+  }
+}
+
+let square = DynamicBehavior::new(Box::new(|num: i64| num * num));
+println!("{} squared is {}", 5, square.run(5))
+----
+
+NOTE: Remember we can't use `impl [trait]` outside of a function's parameters or return value, so to store a closure we need to store it as a `dyn [trait]`. Also remember that `dyn [trait]` is unsized and Rust doesn't like that. We can `Box` it to move passed Rust's complaints (see Chapter 14 : What's a box?).
+
+
+=== Additional reading
+
+* https://doc.rust-lang.org/book/ch13-01-closures.html[The Rust Book: ch 13.01 - Closures]
+* https://doc.rust-lang.org/book/ch19-05-advanced-functions-and-closures.html[The Rust Book: ch 19.05 - Advanced Functions and Closures]
+* https://doc.rust-lang.org/rust-by-example/fn/closures.html[Rust by Example: Closures]
+* https://doc.rust-lang.org/reference/expressions/closure-expr.html[Rust Reference: Closure expressions]
+
+== Wrap-up
+
+Rust's closures are not as terrifying as some people make them out to be. You will eventually get to some gotchas and hairy parts, but we'll tackle those when we deal with async. First though, we've put off lifetimes for long enough. We'll get deeper into Rust's borrow checker in the next chapter before moving on to Arrays, iterators, async, and more.

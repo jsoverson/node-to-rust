@@ -1,0 +1,189 @@
+= Language Part 1: Syntax & Differences
+
+== Introduction
+
+All languages have a productivity baseline. That point where you know enough to be confident. After you reach the baseline, mastery is a matter of learning best practices, remembering what's in standard libraries, and expanding your bag of tricks with experience.
+
+Python has a low productivity baseline. The language is easy to grasp and it's a popular one to learn because of it. JavaScript's baseline is a little higher because of the async hurdle. Typed languages start higher by default due to their additional context.
+
+Rust's productivity baseline is more of a productivity roller coaster. Once you think you've figured it out, you peel back the curtain and realize you actually know nothing.
+
+We're still well below the first baseline but congrats to you for getting this far. This section will fill in some of the blanks and skirt you passed some hair pulling episodes where you scream things like "I just want to make an array!!@!"
+
+=== Notable differences in Rust
+
+==== Rust programming style
+
+The Rust style differs from JavaScript only slightly.
+
+Variables, functions, and modules are in snake case (e.g. `time_in_millis`) vs camel case (e.g. `timeInMillis`) as in JavaScript.
+
+Structs (a cross between JavaScript objects and classes) are in Pascal case (e.g. `CpuModel`) just like similar structures would be in JavaScript.
+
+Constants are similarly in capital snake case (e.g. `GLOBAL_TIMEOUT`).
+
+==== Unambiguous parantheses are optional
+
+[source,rust]
+----
+if (x > y) { /* */ }
+
+while (x > y) { /* */ }
+----
+
+Can be written as
+
+[source,rust]
+----
+if x > y { /* */ }
+
+while x > y { /* */ }
+----
+
+This style is preferred and linters will warn you of it.
+
+==== Almost everything is an expression
+
+Almost everything complete chunk of code returns a value. Obviously `4 * 2` returns a value (`8`), but so does `if true { 1 } else { 0 }` which returns `1`.
+
+That means you can assign the result of blocks of code to variables or use them as return values, e.g.
+
+[source,rust]
+----
+fn main() {
+    let apples = 6;
+    let message = if apples > 10 {
+        "Lots of apples"
+    } else if apples > 4 {
+        "A few apples"
+    } else {
+        "Not many apples at all"
+    };
+
+    println!("{}", message) // prints "A few apples"
+}
+----
+
+Notice how the lines with the strings don't end in a semi-colon. What happens if you add one? What happens if you add a semi-colon to all three?
+
+Spoiler alert: both questions lead to code that won't compile for different reasons. They produce error messages you'll come across frequently. Don't rob yourself the joy of seeing them first hand. It's _exhilirating_. Or just read on.
+
+==== The unit type (`()`)
+
+Rust has no concept of `null` or `undefined` like JavaScript. That sounds great but it's not like those existed for no reason. They mean something. They mean _nothing_, albeit different kinds of nothing. As such, Rust still needs types that can represent _nothing_.
+
+Try adding a semi-colon the first string above so the `if {} else if {} else {}` looks like this:
+
+[source,rust]
+----
+let message = if apples > 10 {
+    "Lots of apples";  // ⬅ Notice the rogue semi-colon
+} else if apples > 4 {
+    "A few apples"
+} else {
+    "Not many apples at all"
+};
+----
+
+Rust won't compile, giving you the error "``if`` and `else` have incompatible types." The full output is below.
+
+[source,output]
+----
+error[E0308]: `if` and `else` have incompatible types
+  --> crates/day-7/syntax/src/main.rs:13:12
+   |
+11 |        let message = if apples > 10 {
+   |   ___________________-
+12 |  |         "Lots of apples";
+   |  |         -----------------
+   |  |         |               |
+   |  |         |               help: consider removing this semicolon
+   |  |         expected because of this
+13 |  |     } else if apples > 4 {
+   |  |____________^
+14 | ||         "A few apples"
+15 | ||     } else {
+16 | ||         "Not many apples at all"
+17 | ||     };
+   | ||     ^
+   | ||_____|
+   | |______`if` and `else` have incompatible types
+   |        expected `()`, found `&str`
+----
+
+The helper text tells you that rust "expected `()`, found `&str`." It also mentions (helpfully) that you might consider removing the semicolon. That'll work, but what's going on and what is `()`?
+
+`()` is called the https://doc.rust-lang.org/std/primitive.unit.html[unit type]. It essentially means "no value." An expression that ends with a semi-colon returns _no value_, or `()`. Rust sees that the `if {}` part of the conditional returns nothing -- or `()` -- and expects every other part of the conditional to return a value of the same type, or `()`. When we leave off the semi-colon, the result of that first block is the return value of the expression `"Lots of apples"` which is (naturally) `"Lots of apples"`.
+
+This brings us to...
+
+==== Implicit returns
+
+We saw how a block can return a value above. Functions are no different. The last line of execution (the "tail") will be used as the return value for a function. You'll frequently see functions that don't have explicit `return` statements, e.g.
+
+[source,rust]
+----
+fn add_numbers(left: i64, right: i64) -> i64 {
+    left + right  // ⬅ Notice no semi-colon
+}
+----
+
+Which is equivalent to:
+
+[source,rust]
+----
+fn add_numbers(left: i64, right: i64) -> i64 {
+    return left + right;
+}
+----
+
+If you specify a return type (the `+-> i64+` above) and accidentally use a semi-colon on your last line, you'll see an error like we saw in the section above:
+
+[source,output]
+----
+  |
+5 | fn add_numbers(left: i64, right: i64) -> i64 {
+  |    -----------                           ^^^ expected `i64`, found `()`
+  |    |
+  |    implicitly returns `()` as its body has no tail or `return` expression
+6 |     left + right;
+  |                 - help: consider removing this semicolon
+----
+
+It will take some getting used to, but you do get used to it. Whenever you see an error complaining about `()`, it's often because you either need to add or remove a semi-colon (or return type) somewhere.
+
+==== Arrays
+
+Rust has arrays. If you use them like you want to however, you're going to have an experience just like you did with strings. I won't go into arrays and slices because there is plenty written on the subject (e.g. https://doc.rust-lang.org/book/ch04-03-slices.html[Rust Book: Ch 4.3] and https://doc.rust-lang.org/rust-by-example/primitives/array.html[Rust by Example: Ch 2.3]).
+
+The short of Rust arrays is: they must have a known length with all elements initialized.
+
+This won't work.
+
+[source,rust]
+----
+let mut numbers = [1, 2, 3, 4, 5];
+numbers.push(7);
+println!("{:?}", numbers);
+----
+
+The reason it's not worth going into is because you're probably not looking for arrays.
+
+What you're looking for is https://doc.rust-lang.org/std/vec/struct.Vec.html[`Vec`] or https://doc.rust-lang.org/std/collections/struct.VecDeque.html[`VecDeque`]. `Vec` is to JavaScript arrays what `String` is to JavaScript strings. ``Vec``'s can grow and shrink at the end. `VecDeque` can grow or shrink from either direction.
+
+NOTE: `VecDeque` is pronounced vec-deck. Deque stands for "Double ended queue."
+
+Arrays and iterators will have their own section in this guide, but know that there's an easy-to-use macro that gives you a `Vec` with similar syntax you're used to.
+
+[source,rust]
+----
+let mut numbers = vec![1, 2, 3, 4, 5];  // ⬅ Notice the vec! macro
+numbers.push(7);
+println!("{:?}", numbers);
+----
+
+== Wrap-up
+
+There is no end to what can trip you up when you try and jump into another language. If you haven't read https://doc.rust-lang.org/stable/book/[The Rust Book], you are going to start having trouble if you haven't already. If you _have_ read https://doc.rust-lang.org/stable/book/[The Rust Book], read it again. Every time you turn a corner in Rust, you'll start to see things more clearly. Documentation will look different. What didn't land right the first time will start to make sense now.
+
+Next up we'll dive into the basic types and start on Structs. Stay tuned!

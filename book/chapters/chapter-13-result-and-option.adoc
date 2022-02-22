@@ -1,0 +1,325 @@
+= Demystifying Results & Options
+
+== Introduction
+
+I briefly touched on the `Option` enum on in Chapter 8 when we were using `HashMap` methods to look up keys. There's no way for the `HashMap` to guarantee that a key will exist, so its API needs to account for returning _something_ as well as _nothing_. Rust has no concept of `undefined` or `null`, like JavaScript. It needs to represent nothingness safely. That's where the `Option` comes in.
+
+Nothingness is like an expected error case for functions that can return either _something_ or _nothing_. `try/catch` statements in JavaScript are another way to deal with reasonable error cases. In those cases the answer is either _your result_ or _uh oh, something went wrong_. That's what a `Result` is. https://doc.rust-lang.org/std/result/enum.Result.html[`Result`] and https://doc.rust-lang.org/std/option/enum.Option.html[`Option`] go hand in hand. They are treated similarly and can be converted from one to another when necessary.
+
+== `Option` recap
+
+If you've gotten this far without exploring enums, you are going to need to brush up quickly with the links in the <<additional-reading,additional reading>> section.
+
+Rust enums differ from many other language implementations. They can represent rich and varied values and carry around behavior just like any struct. The `Option` enum is defined in just a few lines https://doc.rust-lang.org/src/core/option.rs.html#514-523[here]:
+
+[source,rust]
+----
+pub enum Option<T> {
+    /// No value
+    None,
+    /// Some value `T`
+    Some(T),
+}
+----
+
+That's it. It's either `Option::None` and contains no value, or `Option::Some(T)` which contains a `T`. We touched on generic functions briefly in the previous chapter and you can find more information in that day's additional reading section. This is how generic types look on data structures. `Option` doesn't care what `T` is, there are no constraints.
+
+Creating and returning an `Option` is as easy as it gets in Rust.
+
+[source,rust]
+----
+fn main() {
+  let some = returns_some();
+  println!("{:?}", some);
+
+  let none = returns_none();
+  println!("{:?}", none);
+}
+
+fn returns_some() -> Option<String> {
+  Some("my string".to_owned())
+}
+
+fn returns_none() -> Option<String> {
+  None
+}
+----
+
+[source,output]
+----
+[snipped]
+Some("my string")
+None
+----
+
+NOTE: We still need to specify the value of `T` in the `Option<T>` even if we return a `None`.
+
+
+
+NOTE: We can use `Some` & `None` rather than `Option::Some()` and `Option::None` because they are pre-imported by Rust's `prelude` (the common set of imports that you can always rely on). Read up on the https://doc.rust-lang.org/std/prelude/index.html[`std::prelude` here].
+
+
+== `Result`
+
+`Result` is very similar to `Option` except its failure case also contains a value. The value in the `Result::Err` variant usually follows some conventions, but you can see by its implementation it has no constraints.
+
+[source,rust]
+----
+pub enum Result<T, E> {
+  Ok(T),
+  Err(E),
+}
+----
+
+You can return your `Ok()` or `Err()` freely. There's nothing special about how they are created.
+
+[source,rust]
+----
+fn main() {
+  let value = returns_ok();
+  println!("{:?}", value);
+
+  let value = returns_err();
+  println!("{:?}", value);
+}
+
+fn returns_ok() -> Result<String, MyError> {
+  Ok("This turned out great!".to_owned())
+}
+
+fn returns_err() -> Result<String, MyError> {
+  Err(MyError("This failed horribly.".to_owned()))
+}
+
+#[derive(Debug)]
+struct MyError(String);
+----
+
+[source,output]
+----
+[snipped]
+Ok("This turned out great!")
+Err(MyError("This failed horribly."))
+----
+
+NOTE: I used a custom struct to highlight that an `Err` can contain anything. A basic struct, your struct, a `String`, someone else's error, a `HashMap`, whatever.
+
+
+== The problem with `.unwrap()`
+
+`Option` and `Result` seem pretty straightforward, don't they?
+
+The confusion comes from how you actually get your damn value out. You've seen the `.unwrap()` method in this guide and you've undoubtedly seen it all over Rust examples. You have probably also seen the warnings against using it. The warning comes for good reason. If you `.unwrap()` a `None` or `Err`, your code will panic and your application will probably die. That's no good.
+
+If we wanted random application deaths due to failure cases we'd just write JavaScript. I'm kidding but https://twitter.com/markdalgleish/status/1246715512660193287[also I'm not]. With Rust, you can be 99% sure your application will be bullet-proof, *as long as you respect its warnings*. You're not here to write working code fast, you're here to write fast code that always works.
+
+Unfortunately, respecting Rust's warnings can be tedious and repetitive. That's why you see shortcuts like `.unwrap()` in examples. Example code is to get you up and running. It's not there to show you how to handle every possible error case.
+
+=== So how _do_ I get my value out?
+
+Here are your options:
+
+==== `.unwrap()`
+
+So now that you know you shouldn't use `.unwrap()`, here's how you use `.unwrap()`.
+
+Use `.unwrap()` when you're sure you have a `Some()` or an `Ok()`. Look back at our IP address example from the last chapter:
+
+[source,rust]
+----
+let ip_address = std::net::Ipv4Addr::from_str("127.0.0.1").unwrap();
+----
+
+I _know_ that `"127.0.0.1"` is a valid IPv4 address and will be parsed successfully. This is example code but it's also OK in production. `from_str()` needs to return a `Result` because there are an infinite number of strings that _won't_ parse into an IPv4 address. I'm not passing it any of those.
+
+The IP example relies on my knowledge of IP addresses. You can programmatically generate the confidence necessary to use `.unwrap()` as well. You can use a ``HashMaps``'s https://doc.rust-lang.org/beta/std/collections/struct.HashMap.html#method.contains_key[`.contains_key()`] method to ensure there is a key. Then you're free to `.unwrap()` the resulting `.get()` without fear.
+
+That said, it's valuable to always err on the side of caution. Rust won't alert you if a refactor sidesteps your expectations.
+
+==== `.unwrap_or(value)`
+
+https://doc.rust-lang.org/std/option/enum.Option.html#method.unwrap_or[Link to documentation]
+
+`.unwrap_or()` is for providing a custom default value in the event of a failure message. The value needs to be the same type (`T`) as `Ok(T)` or `Some(T)`.
+
+[source,rust]
+----
+let default_string = "Default value".to_owned();
+
+let unwrap_or = returns_none().unwrap_or(default_string);
+
+println!("returns_none().unwrap_or(...): {:?}", unwrap_or);
+----
+
+==== `.unwrap_or_else(|| {})`
+
+https://doc.rust-lang.org/std/option/enum.Option.html#method.unwrap_or_else[Link to documentation]
+
+`.unwrap_or_else()` is nearly identical to `.unwrap_or` except it takes a function. The return value of the function is used when the `Option` or `Result` is `None` or `Err`. You'd use this in situations where the default value might be expensive to compute and there's no value computing it in advance.
+
+As with `.unwrap_or()`, the return type needs to be the same type of `T`.
+
+[source,rust]
+----
+let unwrap_or_else = returns_none()
+  .unwrap_or_else(|| format!("Default value from a function at time {:?}", Instant::now()));
+
+println!(
+  "returns_none().unwrap_or_else(|| {{...}}): {:?}",
+  unwrap_or_else
+);
+----
+
+
+NOTE: The `+|| ...+` syntax is Rust's closure syntax.
+ +
+ +
+In JavaScript/TypeScript, you'd have `+(arg1: number) => arg1 + 2+`. In Rust it is `|arg1: i64| arg1 + 2 `. Curly braces are optional when there's a single expression, just like in JavaScript. We'll go over closures in more detail in a later section.
+
+
+==== `.unwrap_or_default()`
+
+https://doc.rust-lang.org/std/option/enum.Option.html#method.unwrap_or_default[Link to documentation]
+
+`.unwrap_or_default()` defers to a type's `Default` value if none exists. `Default` is a trait like `Debug` or `Display`. It has one method, `default` and takes no arguments. A type that implements `Default` can be instantiated with `[Type]::default()`. In other languages, you might consider this an implementation of the https://en.wikipedia.org/wiki/Null_object_pattern[`Null object pattern`]. It's what you can resort to when you need a neutral value of a type.
+
+In TypeScript, you might do something like:
+
+[source,typescript]
+----
+let my_string = maybe_undefined || "";
+----
+
+In Rust, it would be:
+
+[source,rust]
+----
+let my_string = maybe_none.unwrap_or_default(); // Assuming `T` is `String`.
+----
+
+NOTE: You can implement `Default` like this:
+ +
+[source,rust]
+----
+impl Default for MyStruct {
+  fn default() -> Self {
+    // Return whatever is suitable as a default.
+  }
+}
+----
+
+==== Pattern matching
+
+We can use the `match` expression to match the enum's variants and return the inner value or a suitable default.
+
+[source,rust]
+----
+let match_value = match returns_some() {
+  Some(val) => val,
+  None => "My default value".to_owned(),
+};
+
+println!("match {{...}}: {:?}", match_value);
+----
+
+==== `if let` expressions
+
+You can enter a block conditionally based off an enum's variant. It's easier to explain with an example:
+
+[source,rust]
+----
+if let Some(val) = returns_some() {
+  println!("if let : {:?}", val);
+}
+----
+
+If the `Option` returned by `returns_some()` is `Some()` then its inner value will be bound to the identifier `val`. It's strange syntax to get used to, but it's useful.
+
+==== Automagic unwrapping with `?`
+
+Short circuiting, or returning early, is a common way of dealing with error cases. When you get an error or a `None`, return right away and let the caller deal with it. `Rust` embodies this concept into the `?` operator.
+
+The code below shows a few new tricks.
+
+[source,rust]
+----
+use std::fs::read_to_string;
+
+fn main() -> Result<(), std::io::Error> {
+  let html = render_markdown("./README.md")?;
+  println!("{}", html);
+  Ok(())
+}
+
+fn render_markdown(file: &str) -> Result<String, std::io::Error> {
+  let source = read_to_string(file)?;
+  Ok(markdown::to_html(&source))
+}
+----
+
+* First, we've changed our `main()` to return a `Result` by using `+-> Result<(), std::io::Error>+` on line 3. Remember, `()` is the unit type. It's another way of saying nothing. You can read a return value like `+-> Result<(), ...>+` as "Returns nothing, but may fail".
+* Second, we're using `std::fs::read_to_string()` on line 10. It takes a path and returns a `Result<String, std::io::Error>`. That is, it returns either the contents of a file as a `String`, or it returns an error of the type `std::io::Error`.
+* Third, We automagically unwrap the result into the variable `source` with the `?` operator on line 10. If the result is an error, the `?` returns the result back to the caller, in this case `main()`.
+* Fourth, We automatically unwrap the result from `render_markdown` in `main()` with another `?` on line 4. Since there's no caller above `main()`, an error here will kill our program.
+* Fifth, We finish our `main()` with `Ok(())` because our return type is `+Result<(), ...>+`. We don't care about the value we return, but we have to return `Ok()` regardless.
+
+===== `?` vs `try!`
+
+You may see references to the `try!` macro in some older posts. `try!` was the precursor to `?`. While `try!` is deprecated in favor of `?`, it's still a great way to understand what's happening. The implementation is https://doc.rust-lang.org/src/core/macros/mod.rs.html#396-405[here] and below.
+
+`try!` is a macro and uses macro syntax which will look foreign at first. Macros are beyond the scope of this guide but you're a smart cookie. I bet you can get the gist of what's going on here:
+
+[source,rust]
+----
+macro_rules! r#try {
+    ($expr:expr $(,)?) => {
+        match $expr {
+            $crate::result::Result::Ok(val) => val,
+            $crate::result::Result::Err(err) => {
+                return $crate::result::Result::Err($crate::convert::From::from(err));
+            }
+        }
+    };
+}
+----
+
+The `try!` macro takes an expression and uses that expression in a `match` statement. If the `expression` is `Ok` it returns the inner value. If it's an error, it returns early _and converts the error into the returning ``Result``'s Error type_. That last part is an important one. Let's see what happens if we change our example to take our file path from an environment variable rather than a hardcoded string.
+
+[source,rust]
+----
+use std::fs::read_to_string;
+
+fn main() -> Result<(), std::io::Error> {
+  let html = render_markdown()?;
+  println!("{}", html);
+  Ok(())
+}
+
+fn render_markdown() -> Result<String, std::io::Error> {
+  let file = std::env::var("MARKDOWN")?;
+  let source = read_to_string(file)?;
+  Ok(markdown::to_html(&source))
+}
+----
+
+We've added one line to get the value of an environment variable named `"MARKDOWN"`. That function will fail if no such variable exists. We use another question mark (`?`) to short circuit but now we have a compilation error: ``?` could not convert the error to std::io::Error`...
+
+image::./images/vs-code-conversion-error.png[Visual Studio code showing that `?` could not convert the error to std::io::Error]
+
+That error leaves us at another Rust *WTF*-juncture. A WTFuncture. A Rust-T-F. You understand ``Option``s and ``Result``s. They're not that scary, but how the heck do you deal with all the different errors? We'll get to that in the next chapter.
+
+=== Additional reading
+
+* https://doc.rust-lang.org/book/ch06-00-enums.html[The Rust Book: ch 06 - Enums]
+* https://doc.rust-lang.org/rust-by-example/custom_types/enum.html[Rust by Example: Enums]
+* https://doc.rust-lang.org/reference/items/enumerations.html[The Rust Reference: Enumerations]
+* https://doc.rust-lang.org/rust-by-example/flow_control/match.html[Rust by Example: match]
+* https://doc.rust-lang.org/rust-by-example/flow_control/if_let.html[Rust by Example: if let]
+* https://doc.rust-lang.org/std/result/enum.Result.html[Rust docs: Result]
+* https://doc.rust-lang.org/std/option/enum.Option.html[Rust docs: Option]
+
+== Wrap-up
+
+``Option``s and ``Result``s are everywhere in Rust. You should try thinking in terms of them right away. Enums themselves are everywhere, for that matter. You will often find its better to return or accept values in terms of enums instead of magic values like strings or numbers and booleans that mean more than just `true` or `false`.
+
+This section was all lead-in to the next part of the guide where we go over how to deal with the `Err` side of the `Result`.

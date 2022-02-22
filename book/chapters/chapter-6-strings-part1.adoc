@@ -1,0 +1,250 @@
+= Strings, Part 1
+
+== Introduction
+
+The first hurdle with Rust and strings comes from misaligned expectations. A string literal (`"Hi!"`) isn't an instance of a `String` in Rust. You don't need to fully understand the code below yet, just know that it outputs the types of the values sent to `print_type_of`.
+
+[source,rust]
+----
+fn main() {
+  print_type_of(&"Hi!");
+  print_type_of(&String::new());
+}
+
+fn print_type_of<T>(_: &T) {
+  println!("Type is: {}", std::any::type_name::<T>())
+}
+----
+
+[source,output]
+----
+$ cargo run
+Type is: &str
+Type is: alloc::string::String
+----
+
+Fun fact: JavaScript string literals aren't JavaScript ``String``s either.
+
+[source,js]
+----
+"Hi!" === "Hi!";
+// > true
+
+"Hi!" === new String("Hi!");
+// > false
+----
+
+Wait, there's more.
+
+[source,js]
+----
+typeof "Hi!";
+// > "string"
+
+typeof new String("Hi!");
+// > "object"
+
+typeof String("Hi!");
+// > "string"
+
+"Hi!" === String("Hi!");
+// > true
+
+String("Hi!") === new String("Hi!");
+// > false
+----
+
+That last part is just to point out that if you can learn to love JavaScript, you can learn to love Rust.
+
+JavaScript hand waves away the difference between `string` primitives and `String` instances. It automatically does what you want, when you want it, without incurring the overhead of creating an `Object` for every `string`. When you call a method on a primitive `string`, JavaScript interpreters magically translate it to a method on the `String` prototype.
+
+Rust has similar magic, it just doesn't always do it for you.
+
+== Additional links
+
+There is a _lot_ written about Strings. Don't miss the official docs and other great posts out there.
+
+* https://doc.rust-lang.org/stable/rust-by-example/std/str.html[Strings in the Rust docs]
+* https://www.justanotherdot.com/posts/why-are-there-two-types-of-strings-in-Rust.html[Why Are There Two Types of Strings In Rust?]
+* https://blog.mgattozzi.dev/how-do-i-str-string/[How do I convert a &str to a String in Rust?]
+* https://www.youtube.com/watch?v=ClPrjjHmo2Y[Rust String vs str slices]
+* https://www.ameyalokare.com/rust/2017/10/12/rust-str-vs-String.html[Rust: str vs String]
+* https://blog.thoughtram.io/string-vs-str-in-rust/[String vs &str in Rust]
+
+== Rust strings in a nutshell
+
+=== `&str`
+
+String literals are _borrowed string slices_. That is to say: they are pointers to a substring in other string data. The Rust compiler puts all of our literal strings in a bucket somewhere and replaces the values with pointers. This lets Rust optimize away duplicate strings and is why you have a pointer to a string *slice*, vs a pointer to a single `String`.
+
+You can verify the optimizations are real, if you don't believe me. Copy-paste the print line below a gazillion times (or less) and see that it only has a minor impact on the executable size.
+
+[source,rust]
+----
+fn main() {
+  print("TESTING:12345678901234567890123456789012345678901234567890");
+}
+
+fn print(msg: &str) {
+  println!("{}", msg);
+}
+----
+
+You can also run the (not-rust-specific) `strings` command to output all the string data in a binary.
+
+[source,output]
+----
+$ strings target/release/200-prints | grep TESTING
+TESTING:12345678901234567890123456789012345678901234567890
+----
+
+If you run that command on the `200-unique-prints` binary in the link:github.com/vinodotdev/node-to-rust[node-to-rust] repo, you'll get much more output.
+
+=== `String`
+
+``String``s are the strings that you know and love. You can change them, cut them up, shrink them, expand them, all sorts of great stuff. All that brings along additional cost though. Maybe you don't care, maybe you do. It's in your hands now.
+
+=== How do you make a `&str` a `String`?
+
+In short: use the `.to_owned()` method on a `&str` (a "borrowed" string slice) to turn it into an "owned" `String`, e.g.
+
+[source,rust]
+----
+let my_real_string = "string literal!".to_owned();
+----
+
+For what its worth, this method calls the code below under the hood.
+
+[source,rust]
+----
+String::from_utf8_unchecked(self.as_bytes().to_owned())
+----
+
+NOTE: `self` is Rust's `this`.
+
+This is why we had to go over ownership before we got into strings. String literals start off borrowed. If you need an owned `String`, you have to convert it (copy it, essentially).
+
+=== You're telling me I need to write `.to_owned()` everywhere?
+
+Yes. And no. Sort of. For now, accept "yes" until we get into Traits and generics.
+
+=== What about `.to_string()`, `.into()`, `String::from()`, or `format!()`?
+
+All these options also turn a `&str` into a `String`. If this is your first foray into Rust from node.js, don't worry about this section. This is for developers who have read all the other opinions out there and are wondering why other methods aren't the "one true way."
+
+NOTE: A Rust `trait` is sharable behavior. We haven't gotten to them yet, but think of a trait like a `mixin` if you've ever used the https://javascript.info/mixins[mixin pattern in JavaScript].
+
+==== Why not `.to_string()`?
+
+[source,rust]
+----
+fn main() {
+  let real_string: String = "string literal".to_string();
+
+needs_a_string("string literal".to_string());
+}
+
+fn needs_a_string(argument: String) {}
+----
+
+`something.to_string()` converts _something_ into a string. It's commonly implemeted as part of the `Display` trait. You'll see a lot of posts that recommend `.to_string()` and a lot that don't.
+
+The nuances in the recommendation stem from how much you want the compiler to help you. As your applications grow — especially when you start to deal with generics — you'll inevitably refactor some types into other types. A value that was initially a `&str` might end up being refactored into something else. If the new value still implements `Display`, then it has a `.to_string()` method. The compiler won't complain.t
+
+In contrast, `.to_owned()` turns something borrowed into something owned, often by cloning. Turning a borrowed _`not-string`_ into an owned _`not-string`_ gives the compiler the context necessary to raise an error. If you're OK with the difference, it's easy to change a `.to_owned()` into a `.to_string()`. If you weren't expecting it, then you highlighted an issue before it became a problem.
+
+If you use `.to_string()`, the world won't explode. If you are telling someone they shouldn't use `.to_string()`, you have to be able to explain why. Just like you would if you used the word [octopodes](https://www.dailymotion.com/video/x2voh0q).
+
+NOTE: Clippy has a lint that will alert you if you use `.to_string()` on a `&str`: [clippy::str_to_string](https://rust-lang.github.io/rust-clippy/master/#str_to_string)
+
+=== Why not `something.into()`?
+
+For example:
+
+[source,rust]
+----
+
+fn main() {
+  let real_string: String = "string literal".into();
+
+  needs_a_string("string literal".into());
+}
+
+fn needs_a_string(argument: String) {}
+----
+
+`something.into()` will (attempt) to turn _something_ into a destination type by calling `[dest_type]::from()`, e.g. `String::from(something)`. If the destination type is a `String` and your _something_ is a `&str` then you'll get the behavior you're looking for. The concerns are similar to those above. Are you really trying to turn _something_ into _something else_, or are you trying to turn a `&str` into a `String`? If it's the former, then `.into()` works fine, if it's the latter then there are better ways to do it.
+
+==== Why not String::from()?
+
+[source,rust]
+----
+
+fn main() {
+  let real_string: String = String::from("string literal");
+
+needs_a_string(String::from("string literal"));
+}
+
+fn needs_a_string(argument: String) {}
+
+----
+
+`String::from(something)` is more specific than `.into()`. You are explicitly stating your destination type, but it has the same issues as `.to_string()`. All it expresses is that you want a string but you don't care from where.
+
+=== Why not `format!()`?
+
+[source,rust]
+----
+
+fn main() {
+  let real_string: String = format!("string literal");
+
+  needs_a_string(format!("string literal"));
+}
+
+fn needs_a_string(argument: String) {}
+----
+
+`format!()` is for formatting. This is the only one you should *_definitely_* not use for simply creating a `String`.
+
+NOTE: Clippy also has a lint for this one: https://rust-lang.github.io/rust-clippy/master/#useless_format[clippy::useless_format]
+
+
+=== Implementation details
+
+The path to this "one, true answer" is mapped out here. At the end of the road, everything points to `.to_owned()`.
+
+==== `.to_owned()`
+
+Implemented https://github.com/Rust-lang/Rust/blob/88e5ae2dd3cf4a0bbb5af69ef70e80d5dc7b462c/library/alloc/src/str.rs#L219[here]
+
+Calls `String::from_utf8_unchecked(self.as_bytes().to_owned())`
+
+==== `String::from()`
+
+Implemented https://github.com/Rust-lang/Rust/blob/88e5ae2dd3cf4a0bbb5af69ef70e80d5dc7b462c/library/alloc/src/string.rs#L2511[here]
+
+Calls `.to_owned()`
+
+==== `.to_string()`
+
+Implemented https://github.com/Rust-lang/Rust/blob/88e5ae2dd3cf4a0bbb5af69ef70e80d5dc7b462c/library/alloc/src/string.rs#L2460[here]
+
+Calls `String::from()`
+
+==== `.into()`
+
+Implemented https://github.com/Rust-lang/Rust/blob/88e5ae2dd3cf4a0bbb5af69ef70e80d5dc7b462c/library/core/src/convert/mod.rs#L541[here]
+
+Calls `String::from()`
+
+==== `format!()`
+
+Implemented https://github.com/Rust-lang/Rust/blob/88e5ae2dd3cf4a0bbb5af69ef70e80d5dc7b462c/library/alloc/src/macros.rs#L109[here][here]
+
+Calls `Display::fmt` for `str` https://github.com/Rust-lang/Rust/blob/88e5ae2dd3cf4a0bbb5af69ef70e80d5dc7b462c/library/core/src/fmt/mod.rs#L2155[here]
+
+== Wrap-up
+
+Turning `&str` into `String` is the first half of the string issue. The second is which to use in function arguments when you want to create an easy-to-use API that takes either string literals (`&str`) or `String` instances.

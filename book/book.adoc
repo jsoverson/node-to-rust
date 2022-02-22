@@ -1,0 +1,41 @@
+:author: Jarrod Overson
+:email: jsoverson@gmail.com
+:revnumber: v0.1
+:revdate: 02.22.2022
+:notitle:
+:doctype: book
+:chapter-label:
+:toc: left
+:toclevels: 2
+:sectnums: |,all|
+:toc-title: Table of Contents
+:front-cover-image: image::images/cover.png[leveloffset=0]
+:description: Learn Rust by mapping what you already know from JavaScript and node.js to their counterparts in the Rust ecosystem
+
+= Go From JavaScript to Rust
+
+include::./chapters/chapter-0-introduction.adoc[leveloffset=1]
+include::./chapters/chapter-1-rustup.adoc[leveloffset=1]
+include::./chapters/chapter-2-cargo.adoc[leveloffset=1]
+include::./chapters/chapter-3-vscode.adoc[leveloffset=1]
+include::./chapters/chapter-4-hello-world.adoc[leveloffset=1]
+include::./chapters/chapter-5-ownership.adoc[leveloffset=1]
+include::./chapters/chapter-6-strings-part1.adoc[leveloffset=1]
+include::./chapters/chapter-7-syntax-and-language.adoc[leveloffset=1]
+include::./chapters/chapter-8-types-hashmaps-and-structs.adoc[leveloffset=1]
+include::./chapters/chapter-9-structs-and-behavior.adoc[leveloffset=1]
+include::./chapters/chapter-10-traits.adoc[leveloffset=1]
+include::./chapters/chapter-11-module-system.adoc[leveloffset=1]
+include::./chapters/chapter-12-strings-part2.adoc[leveloffset=1]
+include::./chapters/chapter-13-result-and-option.adoc[leveloffset=1]
+include::./chapters/chapter-14-managing-errors.adoc[leveloffset=1]
+include::./chapters/chapter-15-closures.adoc[leveloffset=1]
+include::./chapters/chapter-16-lifetimes-and-references.adoc[leveloffset=1]
+include::./chapters/chapter-17-arrays-loops-and-iterators.adoc[leveloffset=1]
+include::./chapters/chapter-18-async.adoc[leveloffset=1]
+include::./chapters/chapter-19-starting-a-project.adoc[leveloffset=1]
+include::./chapters/chapter-20-cli-args-and-logging.adoc[leveloffset=1]
+include::./chapters/chapter-21-building-and-running-webassembly.adoc[leveloffset=1]
+include::./chapters/chapter-22-using-json.adoc[leveloffset=1]
+include::./chapters/chapter-23-arc-rc-mutex-and-rwlock.adoc[leveloffset=1]
+include::./chapters/chapter-24-crates-and-tools.adoc[leveloffset=1]

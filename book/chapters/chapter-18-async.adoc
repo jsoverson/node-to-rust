@@ -1,0 +1,253 @@
+= Async in Rust
+
+== Introduction
+
+Rust's async story has its good parts and bad parts. Futures (Rust's promises) are a core part of Rust. Actually being able to use them is not. That's weird, let's break it down.
+
+Rust's standard library defines what an asynchronous task needs to look like with the https://doc.rust-lang.org/std/future/trait.Future.html[`Future`] trait. But implementing `Future` isn't enough to be "async" on its own. You need something that will manage them. You need a futures bucket that checks which futures are done and notifies what's waiting on them. You need an executor and a reactor, kind of like node.js's event loop. You don't get that with Rust. The Rust team left it to the community to decide how best to flesh out the async ecosystem. It may seem nuts, but did you know there was a time where JavaScript didn't have promises? JavaScript had this problem in reverse. It had the executor and reactor but no way to represent a task. The community had to define what a Promise was. We were left polyfilling them until they landed in ES6.
+
+In Rust, you have to polyfill async. Maybe it'll exist in Rust core someday, but that's not relevant. The important part is figuring out which polyfills exist now and how to get started ASAP.
+
+=== Rust async libraries
+
+* https://tokio.rs[Tokio] (https://github.com/tokio-rs/tokio[repo]) (https://crates.io/crates/tokio[crates.io]) (https://docs.rs/tokio[docs.rs])
+* https://async.rs[Async-std] (https://github.com/async-rs[repo]) (https://crates.io/crates/async-std[crates.io]) (https://docs.rs/async-std[docs.rs])
+* Smol (https://github.com/smol-rs/smol[repo]) (https://crates.io/crates/smol[crates.io]) (https://docs.rs/smol[docs.rs])
+
+There are more, but this is already enough. Every library has their audience and there's little point debating which one is "best." What's important right now is which will be the easiest to deal with. That's Tokio. There are libraries that depend on Tokio's behavior which means you can't (easily) use them without also using Tokio's executor. It's a bit of a hostage situation. Tokio's not bad though. It has documentation, loads of community contributions, and there's a lot of code to learn from. It's just a weird situation to be in when you're used to async JavaScript and node.js.
+
+NOTE: Did you know that there used to be many other server-side JavaScript implementations before node.js? Some of them were even single-threaded and required you to deal with blocking logic by forking. Tokio is kind of like node.js. It's an async implementation with a core set of async methods you can rely on. Smol is kind of like deno. It's newer, has an answer for interoperability, but promises to be faster and better.
+
+
+=== Quickstart
+
+Add Tokio as a dependency in your `Cargo.toml` with the `full` feature flag.
+
+[source,toml]
+----
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+----
+
+NOTE: Feature flags expose conditional compilation to users of a library. All tags are arbitrary, "full" doesn't mean anything special. In some libraries feature flags are used to turn on or off platform-specific code. In others like Tokio, it's used to conditionally require what amounts to sub-crates. Tokio used to be split up into many small modules. Community feedback changed that course and now we use feature flags.
+
+When you get more comfortable, you can read up on the feature flags and trim it down to what you need.
+
+
+You must starting an executor before running your futures. Tokio gives you a handy macro that sets everything up behind the scenes. You add it to `main()` and _voila_, you get a fully async Rust.
+
+[source,rust]
+----
+#[tokio::main]
+async fn main()  { // Notice we write async main() now
+}
+----
+
+=== async/.await
+
+Rust has an async/await style syntax like JavaScript. Adding `async` turns a function's return value from `T` into `impl Future<Output = T>`, e.g.
+
+[source,rust]
+----
+fn regular_fn() -> String {
+  "I'm a regular function".to_owned()
+}
+
+async fn async_fn() -> String { // actually impl Future<Output = String>
+  "I'm an async function".to_owned()
+}
+----
+
+Unlike JavaScript, the `await` syntax must be appended to an actual future. It isn't prepended nor can it be used on arbitrary values. It looks like this.
+
+[source,rust]
+----
+
+#[tokio::main]
+async fn main() {
+    let msg = async_fn().await;
+}
+
+----
+
+Also unlike JavaScript, **_your futures don't run until you await them_**.
+
+[source,rust]
+----
+
+#[tokio::main]
+async fn main() {
+    println!("One");
+    let future = prints_two();
+    println!("Three");
+    // Uncomment and move the following line around to see how the behavior changes.
+    // future.await;
+}
+
+async fn prints_two() {
+    println!("Two")
+}
+----
+
+[source,output]
+----
+One
+Three
+----
+
+Uncommenting the line above produces
+
+[source,output]
+----
+One
+Three
+Two
+----
+
+=== async blocks
+
+Asynchronous behavior and closures are part of every developer's toolbox. You will inevitable get to a point where you try to return a closure that's also `async` and you run into this error:
+
+[source,output]
+----
+error[E0658]: async closures are unstable
+ --> src/send-sync.rs:6:15
+  |
+6 |     let fut = async || {};
+  |               ^^^^^
+  |
+  = note: see issue #62290 <https://github.com/rust-lang/rust/issues/62290> for more information
+  = help: to use an async block, remove the `||`: `async {`
+----
+
+https://github.com/rust-lang/rust/issues/62290[Async closures] are unstable but the helper text advises you to use async blocks. Async blocks?
+
+That's right, any old block of code in Rust can be async all on its own. They implement `Future` and can be returned from functions just like any other value:
+
+[source,rust]
+----
+#[tokio::main]
+async fn main() {
+    let msg = "Hello world".to_owned();
+
+ let async_block = || async {
+     println!("{}", msg);
+ };
+ async_block().await; }
+----
+
+You can get all the parts of an async closure you need by making a closure that returns an async block!
+
+[source,rust]
+----
+
+#[tokio::main]
+async fn main() {
+  let msg = "Hello world".to_owned();
+
+  let closure = || async {
+      println!("{}", msg);
+  };
+  closure().await;
+}
+----
+
+=== Send + Sync
+
+Using threads and futures combined with traits will rapidly get you into a situation where you start seeing Rust complain about `Send` and `Sync`, frequently combined with the error `future cannot be sent between threads safely`.
+
+The code below won't compile. It demonstrates a scenario that produces the error.
+
+[source,rust]
+----
+use std::fmt::Display;
+use tokio::task::JoinHandle;
+
+#[tokio::main]
+async fn main() {
+    let mark_twain = "Samuel Clemens".to_owned();
+
+    async_print(mark_twain).await;
+}
+
+fn async_print<T: Display>(msg: T) -> JoinHandle<()> {
+    tokio::task::spawn(async move {
+        println!("{}", msg);
+    })
+}
+----
+
+[source,output]
+----
+error: future cannot be sent between threads safely
+   --> src/send-sync.rs:12:5
+    |
+12  |     tokio::task::spawn(async move {
+    |     ^^^^^^^^^^^^^^^^^^ future created by async block is not `Send`
+    |
+note: captured value is not `Send`
+   --> src/send-sync.rs:13:24
+    |
+13  |         println!("{}", msg);
+    |                        ^^^ has type `T` which is not `Send`
+note: required by a bound in `tokio::spawn`
+   --> /.../tokio-1.15.0/src/task/spawn.rs:127:21
+    |
+127 |         T: Future + Send + 'static,
+    |                     ^^^^ required by this bound in `tokio::spawn`
+help: consider further restricting this bound
+    |
+11  | fn async_print<T: Display + std::marker::Send>(msg: T) -> JoinHandle<()> {
+    |                           +++++++++++++++++++
+----
+
+`Send` and `Sync` are core to how Rust can promise "fearless concurrency". They are automatic traits. That is, Rust automatically adds `Send` or `Sync` to a type if all of its constituent types are also `Send` or `Sync`. These traits indicate whether a type can be sent safely across threads or safely accessed by multiple threads. Without these constructs, you could fall into situations where separate threads clobber each other's data or any number of other problems stemming from multi-threaded programming.
+
+Lucky for you though, many Rust types are already `Sync` _and_ `Send`. You just need to know how to get rid of the error. It's as simple as adding `+ Send`, `+ Sync`, or `+ Sync + Send` to your trait:
+
+[source,rust]
+----
+fn async_print<T: Display + Send>(msg: T) -> JoinHandle<()> {
+    tokio::task::spawn(async move {
+        println!("{}", msg);
+    })
+}
+----
+
+But now we're presented with another error...
+
+[source,output]
+----
+error[E0310]: the parameter type `T` may not live long enough
+   --> src/send-sync.rs:12:5
+    |
+11  | fn async_print<T: Display + Send>(msg: T) -> JoinHandle<()> {
+    |                -- help: consider adding an explicit lifetime bound...: `T: 'static +`
+12  |     tokio::task::spawn(async move {
+    |     ^^^^^^^^^^^^^^^^^^ ...so that the type `impl Future` will meet its required lifetime bounds...
+    |
+----
+
+We went over `'static` in link:./chapter-16-lifetimes-and-references.adoc[Chapter 16: Lifetimes, references, and `'static`] which is perfect. We now know that we shouldn't fear it. Rust knows that it doesn't know when our async code will run. It's telling us that our type (`parameter type `T``) _may_ not live long enough. That wording is important. We just need to let Rust know that the type _can_ last forever. Using `'static` here is not saying that it _will_ last forever.
+
+[source,rust]
+----
+fn async_print<T: Display + Send + 'static>(msg: T) -> JoinHandle<()> {
+    tokio::task::spawn(async move {
+        println!("{}", msg);
+    })
+}
+----
+
+There's a lot more to Send & Sync but we'll deal with that another time.
+
+=== Additional reading
+
+* https://doc.rust-lang.org/std/future/trait.Future.html[Rust docs: Future]
+* https://doc.rust-lang.org/std/keyword.async.html[Rust docs: `async`]
+* https://rust-lang.github.io/async-book/[Asynchronous Programming in Rust book]
+* https://doc.rust-lang.org/nomicon/send-and-sync.html[Rustonomicon: Send & Sync]
+
+== Wrap-up
+
+Async Rust is _beautiful_. There's enough to write a whole book on it alone (and people have). Rust's memory guarantees mean you can write multi-threaded, asynchronous code and be confident it won't explode in your face. _This_ is where you start to turn up the heat and leave JavaScript behind. Yes, you _can_ use threads in node.js and there are web workers but it's a weird middle ground. It's a compromise. With Rust, we don't have to compromise.

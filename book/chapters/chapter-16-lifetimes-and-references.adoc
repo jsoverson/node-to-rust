@@ -1,0 +1,225 @@
+= Lifetimes, References, and 'static
+
+== Introduction
+
+Lifetimes are Rust's way of avoiding dangling references, pointers to memory that has been deallocated. To a user, this might look like a failed operation or a crashed program. To a malicious actor, it's an opening. Accessing the memory behind a dangling reference produces undefined behavior. That is another way of saying it produces behavior that is open for others to define.
+
+
+NOTE: Bugs like https://en.wikipedia.org/wiki/Dangling_pointer#Security_holes_involving_dangling_pointers[dangling references] account for the vast majority of major software vulnerabilities. An analysis from the Chromium team showed that 70% of high severity issues were due to https://www.chromium.org/Home/chromium-security/memory-safety[memory safety bugs]. If this sort of thing interests you, the phrase you need to search for is "use after free" or UAF vulnerabilities. https://pure.security/introduction-to-use-after-free-vulnerabilities/[This is a good introduction] to how they're exploited in browsers. It's _fascinating_.
+
+
+This might sound a little nutty if you've never used a language like C where you manage your own memory. Languages like JavaScript and Java manage memory for you and use garbage collectors to avoid dangling references. Garbage collectors track every time you take a reference to data. They keep that memory allocated as long as the reference count is greater than zero.
+
+Garbage collection was a revolutionary invention _63 years ago_. But it comes with a cost. In extreme cases, garbage collection can freeze your application for full _seconds_. Garbage-minded applications rarely see that high of an impact, but the GC always looms in the background. Like a vampire.
+
+Rust doesn't use a garbage collector yet still avoids dangling references. You get the raw power of a language like C with the safety of a garbage collected language like JavaScript.
+
+NOTE: There are dozens, if not hundreds, of excellent articles written about Rust lifetimes. This chapter will address some of the confusion that arises once you're in the weeds. The <<additional-reading,additional reading>> in this section should be considered a prerequisite.
+
+
+== Lifetimes vs lifetime annotations
+
+You will frequently come across posts, questions, and answers where the phrase "lifetime annotations" is shortened to "lifetimes" which only adds confusion.
+
+A *_lifetime_* is a construct within Rust's borrow checker. Every value has a point where its created and a point where its dropped. That's its lifetime.
+
+A *_lifetime annotation_* is Rust syntax you can add to a reference to give its lifetime a named tag. You must use lifetime annotations in situations where there are multiple references and Rust can't disambiguate them on its own.
+
+Every time you read a sentence like "you must specify a lifetime" or "give the reference a lifetime," it's referring to a lifetime annotation. You can't give a value a new lifetime.
+
+== Lifetime elision
+
+Every reference has a lifetime, even if you don't see annotations. Just because you're not writing annotations on your references doesn't mean you're avoiding them.
+
+This function:
+
+[source,rust]
+----
+fn omits_annotations(list: &[String]) -> Option<&String> {
+  list.get(0)
+}
+----
+
+is equivalent to this function:
+
+[source,rust]
+----
+fn has_annotations<'a>(list: &'a [String]) -> Option<&'a String> {
+  list.get(1)
+}
+----
+
+Both compile and act like you'd expect.
+
+[source,rust]
+----
+fn main() {
+  let authors = vec!["Samuel Clemens".to_owned(), "Jane Austen".to_owned()];
+  let value = omits_annotations(&authors).unwrap();
+  println!("The first author is '{}'", value);
+  let value = has_annotations(&authors).unwrap();
+  println!("The second author is '{}'", value);
+}
+----
+
+[source,output]
+----
+The first author is 'Samuel Clemens'
+The second author is 'Jane Austen'
+----
+
+The reason Rust can do this for you is that there is _one_ reference in the arguments and _one_ reference in the return value. The lifetime of the returned reference therefore _must_ be the same as the lifetime in the passed reference.
+
+This is Rust trying to be helpful. It handles the lifetime annotations for simple cases. The problem is: if Rust handles the trivial cases, the first ones you have to deal with are -- by definition -- non-trivial. It can feel daunting. Don't stress about it. You've got this. The best way to go forward is to go backward. Write out by hand what Rust was doing for you. It'll give you a feel for what is expected.
+
+== The `'static` lifetime
+
+`'static` is described in great detail in every corner of Rust's community. The time spent explaining `'static` makes it seem more complex than it is. I'll try to be as succinct as possible.
+
+There are two ways you'll typically see `'static` used.
+
+. As the explicit lifetime annotation on a reference, e.g.:
+
+[source,rust]
+----
+fn main() {
+  let mark_twain = "Samuel Clemens";
+  print_author(mark_twain);
+}
+fn print_author(author: &'static str) {
+  println!("{}", author);
+}
+----
+
+. Or as the lifetime bounds on generic type parameters, e.g.:
+
+[source,rust]
+----
+fn print<T: Display + 'static>(message: &T) {
+  println!("{}", message);
+}
+----
+
+`&'static` means this reference *_is_* valid for the rest of the program. The data it's pointing to *_will not_* move *_nor_* change. It will always be available. This is why string literals are `&'static`. The data is baked into the program and will never be dropped.
+
+NOTE: `&'static` says nothing about the lifetime of the variable holding the reference, however. The program below exemplifies this behavior.
+
+The `get_memory_location()` function returns the pointer and length of a literal string, a `&'static str`, that it immediately drops. The `get_str_at_location()` function takes a pointer plus a length and attempts to read that memory location back as a `&str`. This works just fine, though we're using dangerous functions and have to mark them as such with the `unsafe` keyword.
+
+Uncomment the final line in `main()` to see why they are unsafe.
+
+[source,rust]
+----
+use std::{slice::from_raw_parts, str::from_utf8_unchecked};
+
+fn get_memory_location() -> (usize, usize) {
+  let string = "Hello World!";
+  let pointer = string.as_ptr() as usize;
+  let length = string.len();
+  (pointer, length)
+  // `string` is dropped here.
+  // It's no longer accessible, but the data lives on.
+}
+
+fn get_str_at_location(pointer: usize, length: usize) -> &'static str {
+  // Notice the `unsafe {}` block. We can't do things like this without
+  // acknowledging to Rust that we know this is dangerous.
+  unsafe { from_utf8_unchecked(from_raw_parts(pointer as *const u8, length)) }
+}
+
+fn main() {
+  let (pointer, length) = get_memory_location();
+  let message = get_str_at_location(pointer, length);
+  println!(
+    "The {} bytes at 0x{:X} stored: {}",
+    length, pointer, message
+  );
+  // If you want to see why dealing with raw pointers is dangerous,
+  // uncomment this line.
+  // let message = get_str_at_location(1000, 10);
+}
+----
+
+[source,output]
+----
+The 12 bytes at 0x562037200057 stored: Hello World!
+----
+
+On the other hand, adding `'static` as a bound is like telling Rust "I want a type that _could_ last forever, if I needed it to." It's _not_ telling Rust you only want data that does live forever.
+
+In friendly terms: `&'static` *!==* `T: 'static`
+
+The code below illustrates how a type like `String` in the second block can satisfy a `'static` constraint for the `static_bound()` function yet not retain the same properties as the `&'static` references in the first block.
+
+[source,rust]
+----
+
+use std::fmt::Display;
+
+fn main() {
+  let r1;
+  let r2;
+  {
+    static STATIC_EXAMPLE: i32 = 42;
+    r1 = &STATIC_EXAMPLE;
+    let x = "&'static str";
+    r2 = x;
+  }
+  println!("&'static i32: {}", r1);
+  println!("&'static str: {}", r2);
+
+let r3;
+
+{
+    let string = "String".to_owned();
+
+ static_bound(&string); // This is *not* an error
+ r3 = &string; // *This* is   }   println!("{}", r3); }
+
+fn static_bound<T: Display + 'static>(t: &T) {
+  println!("{}", t);
+}
+
+----
+
+[source,sh]
+----
+
+error[E0597]: `string` does not live long enough
+  --> crates/day-16/static/src/main.rs:21:10
+   |
+21 |     r3 = &string;
+   |          ^^^^^^^ borrowed value does not live long enough
+22 |   }
+   |   - `string` dropped here while still borrowed
+23 |   println!("{}", r3);
+   |                  -- borrow later used here
+
+For more information about this error, try `rustc --explain E0597`.
+----
+
+
+NOTE: The project day-16-static-bounds in the code repository further illustrates the differences between ``&'static`` and ``T: 'static``.
+
+
+While the two usages are related, the spirit behind each is different.
+
+As a rule: if you need to add a ``&'static`` to make things work, you might want to rethink things. If you need to add a ``'static`` bound to make Rust happy (e.g. ``T: 'static`` or ``+ 'static``), it's probably OK.
+
+NOTE: Because I was curious: Rust's standard library has 48 instances of ``&'static`` (minus ``&'static str``) and 112 instances of ``'static`` as a constraint.
+
+
+=== Additional reading
+
+* https://doc.rust-lang.org/book/ch10-03-lifetime-syntax.html[The Rust Book: ch 10.03 - Validating References with Lifetimes]
+* https://doc.rust-lang.org/rust-by-example/scope/lifetime.html[Rust by Example: Lifetimes]
+* https://doc.rust-lang.org/reference/trait-bounds.html[Rust Reference: Trait and lifetime bounds]
+* https://doc.rust-lang.org/reference/lifetime-elision.html[Rust Reference: Lifetime elision]
+* https://doc.rust-lang.org/nomicon/lifetimes.html[Rustonomicon: Lifetimes]
+* https://github.com/pretzelhammer/rust-blog/blob/master/posts/common-rust-lifetime-misconceptions.md[Common Rust Lifetime Misconceptions]
+* https://github.com/rustviz/rustviz[rustviz: Rust lifetime visualizer]
+* https://blog.logrocket.com/understanding-lifetimes-in-rust/[Understanding lifetimes in Rust]
+
+== Wrap-up
+
+This chapter went through five iterations before ending with this version. One of the biggest source of headaches with generic types, lifetimes, and references is how you use them with popular third party libraries and async code. We haven't yet hit those topics yet. We'll circle back around to common errors and issues when we move into more complex code.

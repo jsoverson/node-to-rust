@@ -1,0 +1,164 @@
+= Strings, Part 2
+
+== Introduction
+
+Now that you're getting confident, you are probably itching to start your own projects. You know how to write some basic Rust. You know how to structure code. You're done with contrived examples with traffic lights. As you play around and start writing your API, you'll inevitably write some function that needs an owned `String`. That's easy. We've done that before. Then it hits you...
+
+Your API, dotted with functions like below:
+
+[source,rust]
+----
+fn my_beautiful_function(arg1: String, arg2: String, arg3: String) {
+  /* ... */
+}
+----
+
+forces your users to write code like this
+
+[source,rust]
+----
+my_beautiful_function(
+  "first".to_owned(),
+  "second".to_owned(),
+  "third".to_owned()
+);
+----
+
+It's so ugly. I just couldn't believe it at first. All I wanted was to create a satisfying API that could take a `String` as well as string literals. I didn't want to make my users do things like add `.to_owned()` all over the place. It's madness. It's hideous.
+
+I spent a long time tracking down what to do. This is my story.
+
+== Should I use `&str` or `String` for my function arguments?
+
+The first question you need to ask is: "Do I need to own or borrow the passed value?"
+
+For those of you still wrapping your head around owning and borrowing, think of this question as: "Do I need my own version of this value or do I just need to look at its data and move on?"
+
+=== When you're borrowing the value
+
+If you _don't_ need your own version, then accept a reference. The main question then becomes "Should I use `&str` or ``&String``" and the answer is almost always `&str`. Why? Well look at the function below.
+
+[source,rust]
+----
+fn print_str(msg: &str) {
+  println!("{}", msg);
+}
+----
+
+You can pass a string literal directly, a `&str` assigned to a variable, and you can pass a reference to a `&String` which works automagically.
+
+[source,rust]
+----
+fn main() {
+  let string_slice = "String slice assigned to variable";
+  let real_string = "Genuine String".to_owned();
+  print_str(string_slice);
+  print_str("Literal slice");
+  print_str(&real_string);
+}
+----
+
+Why? Because the trait https://github.com/Rust-lang/Rust/blob/88e5ae2dd3cf4a0bbb5af69ef70e80d5dc7b462c/library/alloc/src/str.rs#L198[`Borrow<str>` is implemented for `String`]. Anywhere you need a borrowed `str`, you can use a borrowed `String` without any hassle. The reverse is not true. If you change the function signature to accept a `&String` and try to pass a `&str`, you'll get a compile error.
+
+=== When you need an owned value
+
+If you need an owned value then you need a `String` but there are a couple things to consider.
+
+. It is cumbersome to manually convert loads of ``&str``s to `String`. This is a genuine problem when you want to expose a satisfying, easy to use API. The example in the introduction is contrived but it is exactly what you'll deal with frequently.
+. You should let the users of your API decide how to create owned values for you. In other words, you shouldn't simply accept ``&str``s everywhere and convert them yourself. The user may have better ways of getting you the data.
+
+Here's where you want to think about your API. Are you looking to own a string that comes from _wherever_? Or do you expect your functions to be called with a mix of string literals and/or ``String``s?
+
+If it's the former, then you're not really looking for a `&str` _or_ a `String`. You're looking for something that has a `.to_string()` method. That is, you're looking for something that implements `ToString`. Types that implement `ToString` are common, you get it for free by implementing `Display`.
+
+If it's the latter, then you're looking for the common ground between a `String` and `&str`, which we found clues to in the section above.
+
+==== For functions that accept potentially generated strings
+
+For a function that accepts arbitrary strings from anywhere -- generated or non -- you can accept arguments that implement `ToString`.
+
+[source,rust]
+----
+use std::str::FromStr; // Imported to use Ipv4Addr::from_str
+
+fn main() {
+  let ip_address = std::net::Ipv4Addr::from_str("127.0.0.1").unwrap();
+  let string_proper = "String proper".to_owned();
+  let string_slice = "string slice";
+  needs_string(string_slice);
+  needs_string("Literal string");
+  needs_string(string_proper);
+  needs_string(ip_address);
+}
+
+fn needs_string<T: ToString>(almost_string: T) {
+  let real_string = almost_string.to_string();
+  println!("{}", real_string);
+}
+----
+
+We talked about `impl [trait]` vs `dyn [trait]` in the last chapter but now I through in new syntax above. This is Rust's generic syntax. The function `needs_string` above could have been written like this:
+
+[source,rust]
+----
+fn needs_string(almost_string: impl ToString) {
+  let real_string = almost_string.to_string();
+  println!("{}", real_string);
+}
+----
+
+Nothing would need to change in the code. What's the difference? Very little. `impl [trait]` in argument position is less powerful than generic syntax. Rust also has a `where` keyword which you can use to make the same thing yet another way:
+
+[source,rust]
+----
+fn needs_string<T>(string: T)
+where
+  T: ToString,
+{
+  println!("{}", string);
+}
+----
+
+There's zero difference between the `where` syntax and the `<T: ToString>` syntax. Adding the separate `where` clause is for readability.
+
+==== For functions that expect a mix of string literals and ``String``s
+
+If you didn't read this section, you wouldn't lose much. Using the `ToString` method covers a lot of cases. You do however open your users up to the same concerns we described with using `.to_string()` to convert `&str` to `String` in link:./chapter-6-strings-part1.adoc[Chapter 6: Strings, Part 1]. Many structs implement `Display`. A user could pass a lot of objects to the function above without the compiler complaining. Additionally, implementations of `.to_string()` may not always be cheap. Your users don't necessarily know the internals of your code. You might be doing a lot of extra work for no good reason.
+
+Since we already learned that a `&String` can take the place of a `&str`, we can generalize our inputs to anything that can be borrowed like a `str`.
+
+You _could_ use anything that implements `Borrow<str>` and the below would work. However, you should accept anything that implements `AsRef<str>` instead. What's the difference? Borrow assumes more and can fail, `AsRef<str>` assumes little and explicitly *must not fail*. There are more differences but they don't matter for our usage here.
+
+The below is extremely similar to the above but notice that our `ip_address` is no longer a valid argument. Just because it has a printable string form doesn't mean it can be trivially taken as a `str` reference.
+
+[source,rust]
+----
+use std::str::FromStr; // Imported to use Ipv4Addr::from_str
+
+fn main() {
+  let ip_address = std::net::Ipv4Addr::from_str("127.0.0.1").unwrap();
+  let string_slice = "string slice";
+  let string_proper = "String proper".to_owned();
+  needs_string(string_slice);
+  needs_string("Literal string");
+  needs_string(string_proper);
+  // needs_string(ip_address); // Fails now
+}
+
+fn needs_string<T: AsRef<str>>(almost_string: T) {
+  let real_string = almost_string.as_ref().to_owned();
+  println!("{}", real_string);
+}
+----
+
+=== Additional reading
+
+* https://doc.rust-lang.org/book/ch10-00-generics.html[The Rust Book: ch 10]
+* https://doc.rust-lang.org/rust-by-example/generics.html[Rust by Example: Generics]
+* https://doc.rust-lang.org/reference/items/generics.html[The Rust Reference: Generic Parameters]
+
+== Wrap-up
+
+Strings used to seem so simple. We were so naive. I bet every time you dive back into node.js your eyes are going to tear up with joy. Eventually you'll have the same feeling with Rust. You'll appreciate how protective Rust is and how fast everything runs. Rust and JavaScript truly are a beautiful pair.
+
+Next up we'll dive into error handling, the `Option` enum, and the `Result` enum.

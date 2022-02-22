@@ -1,0 +1,496 @@
+= Enums and Methods
+
+== Introduction
+
+In this chapter we'll translate method syntax, TypeScript enums, and show how to use Rust's `match` expressions.
+
+NOTE: We've started using more TypeScript than JavaScript. To run examples, install `ts-node` with `npm install -g ts-node`. If you want a TypeScript playground, check out this https://github.com/jsoverson/typescript-boilerplate/[typescript-boilerplate].
+
+
+=== Adding methods to our struct
+
+NOTE: Depending on who you talk to and the time of day you'll get different definitions for words like "function," "method," "procedure," et al. When I use "method" and "function" here, I'm differentiating between a callable subroutine meant to be executed within the context of instantiated data (a method) and one that isn't (a function).
+
+
+The `new` function we added in the last chapter is like a static function in a TypeScript class. You can call it by name without instantiating a `TrafficLight` first.
+
+[source,rust]
+----
+impl TrafficLight {
+  pub fn new() -> Self {
+    Self {
+      color: "red".to_owned(),
+    }
+  }
+}
+// let light = TrafficLight::new()
+----
+
+Adding methods to Rust structs is straightforward. Mostly.
+
+Consider how you'd add a method like `getState()` in TypeScript:
+
+[source,ts]
+----
+class TrafficLight {
+  color: string;
+
+  constructor() {
+    this.color = "red";
+  }
+
+  getState(): string {
+    return this.color;
+  }
+}
+
+const light = new TrafficLight();
+console.log(light.getState());
+----
+
+By default, every method you add to a TypeScript class is public and is added to the prototype to make it available to all instances.
+
+In Rust, every function in an `impl` defaults to private and is just an everyday function. To make something a method, you specify the first argument to be `self`. You won't frequently need to specify the type of `self`. If you write `&self`, the type defaults to a borrowed `Self` (i.e. `&Self`). When you write `self`, the type is `Self`. You will see libraries that specify more exotic types for `self`, but that's for another time.
+
+NOTE: You may find yourself in a state where you have an instance of something and you _know_ there's a method, but you just can't call it. It could be two things. 1) You're trying to call a trait method that hasn't been imported. You need to import the trait (i.e. `+use [...]::[...]::Trait;+`) for it to be callable. 2) Your instance needs to be wrapped with a specific type. If you see a function like `fn work(self: Arc<Self>)`, then you can only call `.work()` on an instance that is wrapped with an `Arc`.
+
+
+To implement our `getState()` method in Rust, we write:
+
+[source,rust]
+----
+pub fn get_state(&self) -> &String {
+  &self.color
+}
+----
+
+This method _borrows_ `self`, has a return type of `&String`, and returns a reference to its internal property `color`. The full code looks like this:
+
+[source,rust]
+----
+fn main() {
+  let mut light = TrafficLight::new();
+  println!("{:?}", light);
+}
+
+impl std::fmt::Display for TrafficLight {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "Traffic light is {}", self.color)
+  }
+}
+
+#[derive(Debug)]
+struct TrafficLight {
+  color: String,
+}
+
+impl TrafficLight {
+  pub fn new() -> Self {
+    Self {
+      color: "red".to_owned(),
+    }
+  }
+
+  pub fn get_state(&self) -> &str {
+    &self.color
+  }
+}
+----
+
+==== `&self` vs `self`
+
+I made the point of calling out that the method above _borrows_ `self`. The natural corollary is that there must exist methods that _don't_ borrow `self`, methods that take ownership of `self`. If a method requires an _owned_ `self` then that must mean the calling code gives up ownership when it calls the method.
+
+To re-iterate: the calling code loses the instance when it calls the method.
+
+Don't believe me? Let's see what happens when we change the method to this:
+
+[source,rust]
+----
+pub fn get_state(self) -> String {
+  self.color
+}
+----
+
+And call it twice like:
+
+[source,rust]
+----
+fn main() {
+  let light = TrafficLight::new();
+  light.get_state();
+  light.get_state();
+}
+----
+
+This won't compile. Rust will give you an error message you'll get very used to: "use of moved value."
+
+[source,output]
+----
+error[E0382]: use of moved value: `light`
+  --> crates/day-9/structs/src/main.rs:4:18
+   |
+2  |   let light = TrafficLight::new();
+   |       ----- move occurs because `light` has type `TrafficLight`, which does not implement the `Copy` trait
+3  |   println!("{}", light.get_state());
+   |                        ----------- `light` moved due to this method call
+4  |   println!("{}", light.get_state());
+   |                  ^^^^^ value used here after move
+   |
+note: this function takes ownership of the receiver `self`, which moves `light`
+  --> crates/day-9/structs/src/main.rs:25:20
+   |
+25 |   pub fn get_state(self) -> String {
+   |                    ^^^^
+
+For more information about this error, try `rustc --explain E0382`.
+----
+
+Losing a value (having it moved) when you call a method might be hard to wrap your head around at first. You never deal with such a concept in JavaScript. However, you do write code where it would make sense. Scenarios like:
+
+* In conversions: When you take some data and convert it to another. In Rust you literally take (take ownership of) some data and return (give away ownership to) new data.
+* In cleanup code. When an object gets destroyed or otherwise cleaned up, the calling code is usually done with the instance.
+* In builder patterns or chainable APIs. You can take an owned `self`, mutate it, and return it so the calling code can chain on another method.
+
+There are other use cases and even more that require different ways of thinking about `self`. You'll get there in time.
+
+=== Mutating state
+
+Things are going swimmingly but our `TrafficLight` isn't very useful. It never changes color. Everything in Rust is immutable by default. Even our own `self`. We need to mark this method as one that can needs a mutable `self`. If we wrote our method like this...
+
+[source,rust]
+----
+pub fn turn_green(&self) {
+  self.color = "green".to_owned()
+}
+----
+
+...Rust would yell at us
+[source,output]
+----
+error[E0594]: cannot assign to `self.color`, which is behind a `&` reference
+  --> crates/day-8/structs/src/main.rs:32:5
+   |
+31 |   pub fn turn_green(&self) {
+   |                     ----- help: consider changing this to be a mutable reference: `&mut self`
+32 |     self.color = "green".to_owned()
+   |     ^^^^^^^^^^ `self` is a `&` reference, so the data it refers to cannot be written
+
+For more information about this error, try `rustc --explain E0594`.
+----
+
+What we need is a mutable reference (see link:./chapter-5-ownership.adoc[Chapter 5: Borrowing & Ownership]).
+
+We need `&mut self`.
+
+[source,rust]
+----
+pub fn turn_green(&mut self) {
+  self.color = "green".to_owned()
+}
+----
+
+We also need to mark our instance of `TrafficLight` as mutable in the calling code. Otherwise Rust will yell at us again.
+
+In `main()`, change `+let light = ...+` to `+let mut light = ...+`.
+
+[source,rust]
+----
+let mut light = TrafficLight::new();
+----
+
+Our code now looks like this
+
+[source,rust]
+----
+fn main() {
+  let mut light = TrafficLight::new();
+  println!("{:?}", light);
+  light.turn_green();
+  println!("{:?}", light);
+}
+
+impl std::fmt::Display for TrafficLight {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "Traffic light is {}", self.color)
+  }
+}
+
+#[derive(Debug)]
+struct TrafficLight {
+  color: String,
+}
+
+impl TrafficLight {
+  pub fn new() -> Self {
+    Self {
+      color: "red".to_owned(),
+    }
+  }
+
+  pub fn get_state(&self) -> &str {
+    &self.color
+  }
+
+  pub fn turn_green(&mut self) {
+    self.color = "green".to_owned()
+  }
+}
+----
+
+And it's output is
+
+[source,output]
+----
+[snipped]
+TrafficLight { color: "red" }
+TrafficLight { color: "green" }
+----
+
+=== Enums
+
+If you're like me, you were getting itchy seeing "red" and "green" written out as strings. Using data types like strings or numbers to represent a finite set of possibilities (i.e. red, green, and yellow) leaves too much opportunity for failure. This is what enums are for.
+
+To migrate our string to an enum in TypeScript, you'd write this:
+
+[source,typescript]
+----
+
+class TrafficLight {
+  color: TrafficLightColor;
+
+constructor() {
+    this.color = TrafficLightColor.Red;
+  }
+
+getState(): TrafficLightColor {
+    return this.color;
+  }
+
+turnGreen() {
+    this.color = TrafficLightColor.Green;
+  }
+}
+
+enum TrafficLightColor {
+  Red,
+  Yellow,
+  Green,
+}
+
+const light = new TrafficLight();
+console.log(light.getState());
+light.turnGreen();
+console.log(light.getState());
+
+----
+
+This prints
+
+[source,sh]
+----
+
+0
+2
+----
+
+TypeScript's default enum value representation is a number but you can change it to a string via:
+
+[source,typescript]
+----
+enum TrafficLightColor {
+  Red = "red",
+  Yellow = "yellow",
+  Green = "green",
+}
+----
+
+In Rust, enums are similarly straightforward:
+
+[source,rust]
+----
+enum TrafficLightColor {
+  Red,
+  Yellow,
+  Green,
+}
+----
+
+With our struct and implementation changing as such:
+
+[source,rust]
+----
+struct TrafficLight {
+  color: TrafficLightColor,
+}
+
+impl TrafficLight {
+  pub fn new() -> Self {
+    Self {
+      color: TrafficLightColor::Red,
+    }
+  }
+
+  pub fn get_state(&self) -> &TrafficLightColor {
+    &self.color
+  }
+
+  pub fn turn_green(&mut self) {
+    self.color = TrafficLightColor::Green
+  }
+}
+
+enum TrafficLightColor {
+  Red,
+  Yellow,
+  Green,
+}
+----
+
+Now though, we're bitten by the the traits we implemented and derived. VS Code and rust-analyzer are probably already yelling at you because we just made our `TrafficLight` unprintable and undebuggable because `TrafficLightColor` is both unprintable and undebuggable.
+
+We need to derive `Debug` and implement `Display` for `TrafficLightColor` just as we did with `TrafficLight`. We can derive on an `enum` exactly the same way we did with our `struct`.
+
+Add `#[derive(Debug)]` just before the enum definition.
+
+[source,rust]
+----
+#[derive(Debug)]
+enum TrafficLightColor {
+  Red,
+  Yellow,
+  Green,
+}
+----
+
+That took care of one problem. Now we have to implement `Display`. That'll be a little different this time. We want to write out a different string for every variant. To do that we use a https://doc.rust-lang.org/reference/expressions/match-expr.html[match] expression. `match` is similar to a `switch/case` except better in every way.
+
+First things first, let's making writing this stuff easier. Write out the impl for `Display` like this:
+
+[source,rust]
+----
+impl Display for TrafficLightColor {}
+----
+
+If your code follows along with ours, VS Code will complain at `Display`, saying `"cannot find trait `Display` in this scope"`. Place your cursor on display and press `Ctrl+.` (or hover and press "Quick fix"). If rust-analyzer has any suggestions, you'll see them in a drop down menu.
+
+image::./images/vs-code-quick-code-import.png[Drop down showing "Import Display"]
+
+Select `Import Display` and select `std::fmt::Display` from the next drop down. VS Code will take care of adding the `use std::fmt::Display;` line at the top of your file. Nice! Free code!
+
+But now we have an even longer squiggly red line.
+
+image::./images/vs-code-quick-code-impl-display.png[Line showing error for Display impl]
+
+Do the `Ctrl+.` shuffle once again, select `Implement missing members` and voila! You've got the boilerplate out of the way.
+
+[source,rust]
+----
+impl Display for TrafficLightColor {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    todo!()
+  }
+}
+----
+
+Get used to using this, it's a life saver.
+
+
+NOTE: the https://doc.rust-lang.org/std/macro.todo.html[`todo!`] macro panics. It's a useful, temporary placeholder.
+
+
+A match expression allows us to match the result of an expression against a pattern. The following code matches the possible values of `TrafficLightColor` against its `self` to produce an appropriate display string.
+
+[source,rust]
+----
+impl Display for TrafficLightColor {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let color_string = match self {
+      TrafficLightColor::Green => "green",
+      TrafficLightColor::Red => "red",
+      TrafficLightColor::Yellow => "yellow",
+    };
+    write!(f, "{}", color_string)
+  }
+}
+----
+
+
+NOTE: https://doc.rust-lang.org/std/macro.write.html[write!] is another macro. It takes a formatter + formatting arguments and returns a Result. A `Result` is like an `Option` and we'll get to it soon. Just think of `write!` as the `print!` you use when implementing `Display`.
+
+
+Our final code looks like this:
+
+[source,rust]
+----
+use std::fmt::Display;
+
+fn main() {
+  let mut light = TrafficLight::new();
+  println!("{}", light);
+  println!("{:?}", light);
+  light.turn_green();
+  println!("{:?}", light);
+}
+
+impl std::fmt::Display for TrafficLight {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "Traffic light is {}", self.color)
+  }
+}
+
+#[derive(Debug)]
+struct TrafficLight {
+  color: TrafficLightColor,
+}
+
+impl TrafficLight {
+  pub fn new() -> Self {
+    Self {
+      color: TrafficLightColor::Red,
+    }
+  }
+
+  pub fn get_state(&self) -> &TrafficLightColor {
+    &self.color
+  }
+
+  pub fn turn_green(&mut self) {
+    self.color = TrafficLightColor::Green
+  }
+}
+
+#[derive(Debug)]
+enum TrafficLightColor {
+  Red,
+  Yellow,
+  Green,
+}
+
+impl Display for TrafficLightColor {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let color_string = match self {
+      TrafficLightColor::Green => "green",
+      TrafficLightColor::Red => "red",
+      TrafficLightColor::Yellow => "yellow",
+    };
+    write!(f, "{}", color_string)
+  }
+}
+----
+
+And outputs
+
+[source,output]
+----
+[snipped]
+Traffic light is red
+TrafficLight { color: Red }
+TrafficLight { color: Green }
+----
+
+== Wrap-up
+
+https://doc.rust-lang.org/reference/types/struct.html[Structs] and https://doc.rust-lang.org/reference/items/enumerations.html[enums] are the most important structures you will deal with in Rust. Rust enums encapsulate common usage like above but are also Rust's answer to union types. They can represent much more complex values than TypeScript. Similarly, match expressions are also much more powerful than we let on above. You'll frequently use enums and match expressions hand in hand. Don't ignore them or push off learning more about them. You'll regret it because it changes the way you think about code in Rust.
+
+It's important to take our time going through these sections. It's easier to highlight the nuance and the error messages when there's a natural flow of code progression. Some sections take this route, others are more direct mapping of TypeScript/JavaScript to Rust. If you have comments on what you like better about one style or the other, drop me a line!

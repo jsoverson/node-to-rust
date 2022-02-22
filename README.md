@@ -1,8 +1,26 @@
-# Advent of Rust: 24 Days From node.js to Rust
+# From JavaScript to Rust ebook
 
-This repository is for code related to the guide at: https://vino.dev/blog/node-to-rust-day-1-rustup/
+This repository houses an ebook-ified version of the 24+ post series started on [vino.dev](https://vino.dev/blog/node-to-rust-day-1-rustup/).
 
-## Running projects
+## How to build
+
+The ebook is built using [asciidoctor](https://docs.asciidoctor.org/) and requires ruby >2.3.
+
+Install the ruby dependencies via `make deps`
+
+```console
+$ make deps
+```
+
+Build a PDF via the command `make book`
+
+```console
+$ make book
+```
+
+## Running code and projects
+
+All code are housed in the `src/` directory.
 
 ### Day 4
 
@@ -189,3 +207,8 @@ First you must cd into `crates/day-22/wapc-guest`
 - `cargo run -p day-23-rc-arc --bin arc`
 - `cargo run -p day-23-rc-arc --bin rwlock`
 - `cargo run -p day-23-rc-arc --bin async` - intentionally does not compile
+
+## License
+
+Book: Creative Commons BY-NC-ND 4.0
+Code: Creative Commons BY 4.0

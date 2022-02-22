@@ -1,0 +1,195 @@
+= The Module System
+
+== Introduction
+
+When released, one of node.js's outstanding features was how simple it was to use. Want to run a JavaScript file? Just use `node file.js`. Want to include a local module? Then `require("./module.js")`. If your `require()` wasn't a relative or absolute path, then node looked in the `node_modules` folder. It was a beautiful time. If you've gotten into node.js within the last few years, you probably have a different view of how simple it is or isn't. It *_was_* simple, once upon a time. I swear.
+
+Rust's module system is a bit more nuanced. Once you "get it," it won't stand in your way. Until then you might be left wondering "WTF" more than once.
+
+== "How do I import a file in Rust?"
+
+The quick answer is, you don't. You don't import files in Rust. You declare modules. If you declare a module with an empty body, then Rust will look for it on the file system according to its resolution algorithm. That resolution algorithm is highly dependent on the project's module structure.
+
+You declare modules with the `mod` keyword. If you write `mod my_module;` then Rust will look for a module named `my_module` which may be found in a file named `my_module.rs`. But it may not.
+
+There isn't a relative file path relationship like you'd have in node.
+
+== "How do I import functions from other modules?"
+
+The `use` statement brings items from a module into scope of the current module so you can use them without qualifying them. This works with both external dependencies and local modules.
+
+These two are largely the same:
+
+[source,rust]
+----
+some_module::some_function();
+----
+
+and
+
+[source,rust]
+----
+use some_module::some_function;
+some_function()
+----
+
+Use `{}` to import multiple items, e.g.
+
+[source,rust]
+----
+use std::io::{Read, Write};
+----
+
+Use `super` to import items from a parent module, e.g.
+
+[source,rust]
+----
+fn work() {}
+
+mod test {
+	use super::work;
+}
+----
+
+Use `crate` to import items starting from the crate root, e.g.
+
+[source,rust]
+----
+use crate::some_module::some_function
+----
+
+== The pieces of the Rust Module System
+
+=== Crates and the crate root
+
+A Rust project is called a `crate`. The `crate root` is the source file that the Rust compiler starts with. In node that's commonly called `index.js` and you would define it by setting the `"main"` field in your package.json. In Rust the root is typically `main.rs` for standalone executables and `lib.rs` for libraries. It's configurable in your `Cargo.toml`.
+
+The crate root dictates the root path where Rust will start its search for imported modules.
+
+=== What is a module?
+
+It's easiest if you start with the understanding that Rust modules have _nothing_ to do with file names or paths. You'll see documentation that says otherwise and projects that make this appear to be the case, but it's a lie. Modules are purely a concept within Rust's brain.
+
+A module is like a namespace where you bucket similar things. Modules are barriers for visibility, i.e. public, private, etc. You can have many modules in one file. Even nesting them in a single file is allowed.
+
+[source,rust]
+----
+fn main() {
+  my_module::print(my_module::submodule::MSG);
+}
+
+mod my_module {
+  pub fn print(msg: &str) {
+    println!("{}", msg);
+  }
+
+  pub mod submodule {
+    pub const MSG: &str = "Hello world!";
+  }
+}
+----
+
+Separating logic into different files is important for humans. Not Rust. Luckily Rust has support for automatically looking up modules on the local filesystem.
+
+Let's say we want to extract `my_module` into another file. We cut and paste its code into a file called `my_module.rs` and keep an empty `mod my_module;` in our `main.js`. The result looks like this:
+
+[source,rust]
+----
+
+fn main() {
+  my_module::print(my_module::submodule::MSG);
+}
+
+mod my_module;
+
+----
+
+[source,rust]
+----
+
+pub fn print(msg: &str) {
+  println!("{}", msg);
+}
+
+pub mod submodule {
+  pub const MSG: &str = "Hello world!";
+}
+----
+
+Our `main.js` shows we're declaring a module called `my_module`, but it's empty. Rust needs to find it.
+
+=== How Rust finds files
+
+The resolution algorithm in a nutshell is:
+
+. Start in a directory with the same path parts as the current module. For example, if you're in the crate root, the path is `./`. If you're in the module `one::two::three`, then start in `./one/two/three`.
+. Look for a file with the name of the imported module (e.g. `mod my_module` would look for `my_module.rs`)
+. Look for a file named `mod.rs` in a directory with the name of the imported module (e.g. `my_module/mod.rs`)
+. If none are found, complain. If both are found, complain. If one is found, use that one.
+
+_Note: The `mod.rs` part is technical baggage. It used to be the only way. It's not recommended anymore but you'll still see it on some projects so it's worth knowing about._
+
+What this means is that well-organized projects _seem_ like their modules mirror a file system with relative imports. This can bite you if you assume that's always true. The appearance is due to a project being well-organized. It's not a structure Rust imposes.
+
+Take a lone `main.rs` with the code below for example
+
+[source,rust]
+----
+fn main() {}
+
+mod module_a;
+
+mod one {
+  mod two {
+    mod module_b;
+  }
+}
+----
+
+Both `mod module_a` and `mod module_b` statements are in the same file. Where does Rust look for the modules on disk?
+
+Rust looks for `module_a` in `./module_a.rs` or `./module_a/mod.rs`.
+
+Rust looks for `module_b` in `./one/two/module_b.rs` or `./one/two/module_b/mod.rs`. `mod module_b` is declared in `one::two`, so it's namespace parts are `one::two::module_b` and that's what dictates the lookup.
+
+=== Visibility
+
+By default everything you define is private. BUT -- and this is a big BUT -- visibility is at the module barrier, not an item's definition. That means everything in a module can access everything else in the same module. If you take the ``pub``s off of everything in our traffic light example, it will still work. Sorry to trick you.
+
+
+NOTE: Everything is private by default except for trait methods and enum variants. All trait methods and enum variants are public by default. In practical terms, that means they have the same visibility as the trait or enum they're defined on. It wouldn't make much sense to have them be anything else.
+
+
+Visibility also only works up and out. Modules defined closer to the root can't see anything defined deeper unless you change its visibility. You change visibility with the `pub` keyword.
+
+`pub` makes something completely public, but only if it's reachable via the visibility chain. That is, everything leading up to the `pub` item must also be `pub`.
+
+You can tailor the visibility with modifiers on `pub`, e.g.
+
+* `pub(crate)` - public within the crate, i.e. not externally visible.
+* `pub(super)` - public to the parent module only.
+
+There are other modifiers, but they're less common. You can learn about them in the [Additional reading section][].
+
+=== Traffic light exercise
+
+The traffic light example from the past few days has grown pretty large. It's due for some refactoring. Try to do it yourself. See what hurdles you run into before referring to the https://github.com/vinodotdev/node-to-rust/tree/master/src/crates/day-11/traffic-light[code repository] to see how I've done it.
+
+==== Tips:
+
+* Copy/paste is your friend. This won't need to refactor code structure or names.
+* You must declare modules from their root module file, they can't all be declared from `main.rs`
+* After moving code around, you'll need to adjust visibility to still use the items in `main()`.
+* You'll likely need to update or add `use` statements in all the files you create.
+* Visual Studio Code and rust-analyzer is your friend. Use the hover tips and "Quick code" fixes liberally.
+
+=== Additional reading
+
+* https://doc.rust-lang.org/book/ch07-00-managing-growing-projects-with-packages-crates-and-modules.html[The Rust Book: ch 7]
+* https://doc.rust-lang.org/rust-by-example/mod.html[Rust by Example: Modules]
+* https://doc.rust-lang.org/rust-by-example/crates.html[Rust by Example: Crates]
+* https://doc.rust-lang.org/reference/items/modules.html[The Rust Reference: Modules]
+
+== Wrap-up
+
+Repeat after me: `mod` is not `import`. Again, for those in the back: `mod` is not `import`. Once you get passed that misconception (and the mod.rs wonkiness), the module system is easy to manage. We've finally gone through enough to circle back around to the second part of our Strings guide. We'll get to that immediately in the next chapter.

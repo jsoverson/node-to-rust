@@ -1,0 +1,674 @@
+= Arrays, Loops, and Iterators
+
+== Introduction
+
+Translating common JavaScript use cases for Arrays and loops requires learning some new concepts and data types. You'll also need to get comfortable reading and writing more code than you're used to. In some ways, Rust is more succinct than JavaScript. In others, what could have been a one-liner in JavaScript may be ten times more code in Rust.
+
+We touched on `Vec` and `VecDeque` in Chapter 7 which will be your go-to list structures. The next hurdle is wrapping your head around Iterators. Many of the Array methods you're used to using in JavaScript exist in Rust, but they are wrapped in a lazy `Iterator` construct.
+
+== Recap: `vec![]`, `Vec`, and `VecDeque`
+
+Actual Rust arrays must have a known length with all elements initialized. You can mutate the internal elements, but you can't grow or shrink them.
+
+This won't work.
+
+[source,rust]
+----
+let mut numbers = [1, 2, 3, 4, 5];
+numbers.push(7); // no method named `push` found for array `[{integer}; 5]`
+println!("{:?}", numbers);
+----
+
+To get the flexible lists you're used to, you need a https://doc.rust-lang.org/std/vec/struct.Vec.html[`Vec`] or https://doc.rust-lang.org/std/collections/struct.VecDeque.html[`VecDeque`]. `Vec` is to JavaScript arrays what `String` is to JavaScript strings. ``Vec``'s can only grow and shrink at the end. `VecDeque` can grow or shrink from either direction.
+
+Creating a `Vec` is easy with the `vec![]` macro. Add it to your cheatsheet. You'll use it frequently.
+
+[source,rust]
+----
+
+let mut numbers = vec![1, 2, 3, 4, 5];  // ⬅ Notice the vec! macro
+numbers.push(7);
+println!("", numbers);
+
+----
+
+== Loops
+
+=== `for ( … ; … ; … )`
+
+Rust does not have a for loop like this for good reason. It's cumbersome syntax for a general loop that mostly gets used one way:
+
+1. We initialize a single variable (e.g. `i`) and assign it the minimum value in a range (e.g. `0`).
+2. We test if the variable is greater than the maximum value in the range (e.g. `i < max`).
+3. Every loop we increment the variable by `1`.
+
+Rust generalizes this use case into its `for…in` expression combined with the [range operator](https://doc.rust-lang.org/std/ops/struct.Range.html) (e.g. `0..10`).
+
+[source,ts]
+----
+
+let max = 4;
+for (let i = 0; i < max; i++) {
+  console.log(i);
+}
+----
+
+[source,rust]
+----
+
+let max = 4;
+for i in 0..max {
+  println!("{}", i);
+}
+
+----
+
+[source,sh]
+----
+
+1
+2
+3
+----
+
+=== `for…in`
+
+Rust doesn't have the same kinds of `Object` types that JavaScript has. There's no real way of iterating over the properties of arbitrary objects. Rust does have Map types like `HashMap` though (see link:./chapter-8-types-hashmaps-and-structs.adoc[Chapter 8]). You can use the `.keys()` method to get an iterator over the map's keys.
+
+NOTE: `.keys()` visits keys in arbitrary order. You don't get a say in this.
+
+
+[source,ts]
+----
+
+let obj: any = {
+  key1: "value1",
+  key2: "value2",
+};
+for (let prop in obj) {
+  console.log(`+${prop}: ${obj[prop]}+`);
+}
+
+----
+
+[source,rust]
+----
+
+let obj = HashMap::from([
+  ("key1", "value1"),
+  ("key2", "value2")
+]);
+for prop in obj.keys() {
+  println!("{}: {}", prop, obj.get(prop).unwrap());
+}
+----
+
+[source,output]
+----
+key1: value1
+key2: value2
+----
+
+=== `for…of`
+
+JavaScript's `for…of` translates almost 1-to-1 with Rust's `for…in`
+
+[source,ts]
+----
+
+let numbers = [1, 2, 3, 4, 5];
+for (let number of numbers) {
+  console.log(number);
+}
+
+----
+
+[source,rust]
+----
+
+let numbers = [1, 2, 3, 4, 5];
+for number in numbers {
+  println!("{}", number);
+}
+----
+
+[source,output]
+----
+1
+2
+3
+4
+5
+----
+
+=== `while` loops
+
+While loops are https://doc.rust-lang.org/stable/rust-by-example/flow_control/while.html[straightforward] to understand, but there are common cases that Rust handles better than a straight translation.
+
+==== `while (!done)`...
+
+One such case is using a `while` to loop until something is "done," whatever done might mean.
+
+[source,ts]
+----
+
+let obj = {
+  data: ["a", "b", "c"],
+  doWork() {
+    return this.data.pop();
+  },
+};
+
+let data;
+while ((data = obj.doWork())) {
+  console.log(data);
+}
+
+----
+
+The Rust counterpart uses `while let` syntax to match against the return value and conditonally continue the loop. The loop continues as long as `.doWork()` returns a `Some()`. You can do this similarly with `Result`s and `Ok` and any other type.
+
+[source,rust]
+----
+
+struct Worker {
+  data: Vec<&'static str>,
+}
+impl Worker {
+  fn doWork(&mut self) -> Option<&'static str> {
+    self.data.pop()
+  }
+}
+let mut obj = Worker {
+  data: vec!["a", "b", "c"],
+};
+
+while let Some(data) = obj.doWork() {
+  println!("{}", data);
+}
+----
+
+[source,output]
+----
+c
+b
+a
+----
+
+=== `do … while`
+
+Rust has no `do…while` loop. You can get similar behavior with `loop` described next.
+
+==== `while (true) …`
+
+Rust's `loop` expression simply loops forever. It's handier than you might think at first glance, and much more intuitive than `while (true)`.
+
+[source,ts]
+----
+
+let n = 0;
+
+while (true) {
+  n{pp};
+  if (n > 3) break;
+  else console.log(n);
+}
+
+----
+
+[source,rust]
+----
+
+let mut n = 0;
+loop {
+  n += 1;
+  if n > 3 {
+    break;
+  }
+}
+println!("Finished. n={}", n);
+----
+
+[source,output]
+----
+Finished. n=4
+----
+
+== Labels, `break`, `continue`
+
+In Rust, labels work the same way as they do in JavaScript, with the only difference being Rust labels are prefixed with an apostrophe.
+
+[source,ts]
+----
+
+outer: while (true) {
+  while (true) {
+    break outer;
+  }
+}
+
+----
+
+[source,rust]
+----
+
+'outer: loop {
+  loop {
+    break 'outer;
+  }
+}
+----
+
+== `break` & `loop` expressions
+
+`loop` blocks are expressions themselves and can return values. This is a better alternative than initializing a variable outside a loop just so you can update it internally.
+
+[source,rust]
+----
+
+let value = loop {
+  if true {
+    break "A";
+  } else {
+    break "B";
+  }
+};
+println!("Loop value is: {}", value);
+
+----
+
+[source,sh]
+----
+
+Loop value is: A
+----
+
+== Intro to Rust Iterators
+
+Iterators are how Rust deals with operations on a sequence. Iterators can be chained to produce more iterators. Unlike JavaScript's iteration methods, Rust iterators are lazy. They don't execute until you call a method that needs a value.
+
+All iterators implement the https://doc.rust-lang.org/std/iter/trait.Iterator.html[Iterator] trait which gives each a similar interface. This trait is different than some of the more basic Rust traits. It has an associated type named `Item` and is a placeholder for the type of the elements being iterated over. You don't need to worry about it much until you start trying to build your own iterators or return them from functions.
+
+
+NOTE: Associated types in traits are similar to generics. They are a placeholder for a type that the implementer will define. To learn more about how they're different, read https://doc.rust-lang.org/book/ch19-03-advanced-traits.html[The Rust Book, ch 19.03: Advanced Traits]
+
+
+=== How to get and use iterators
+
+Because a `Vec` isn't an iterator itself, we have to call a method to make it one. And because ``Iterator``s are lazy, we have to call a method to get any value at all out of them. This means we have to add two method calls every time we want to iterate and return a value. It's a lot of noise:
+
+[source,rust]
+----
+let list = vec![1, 2, 3];
+let doubled: Vec<_> = list
+  .iter()
+  .map(|num| num * 2)
+  .collect();
+println!("{:?}", doubled);
+----
+
+[source,output]
+----
+[2, 4, 6]
+----
+
+The `.iter()` method on many structures returns an `Iterator`, while the `Iterator` method `.collect()` consumes the rest of an iterator and returns a single value.
+
+To get a single value out of an iterator, you'd use the `.next()` method.
+
+NOTE: *error[E0282]: type annotations needed*
+
+When you start using `.collect()` you will probably run into the error : `error[E0282]: type annotations needed` right away.
+
+[source,rust]
+----
+let list = vec![1, 2, 3];
+let doubled = list.iter().map(|num| num * 2).collect();
+----
+
+[source,output]
+----
+error[E0282]: type annotations needed
+  --> crates/day-17/iterators/src/main.rs:13:7
+   |
+13 |   let doubled = list.iter().map(|num| num * 2).collect();
+   |       ^^^^^^^ consider giving `doubled` a type
+
+For more information about this error, try `rustc --explain E0282`.
+----
+
+When I started, I couldn't figure out why I needed to annotate my types. Rust knew the types going into `map()` and knew the types coming out. Why do I need to annotate them like this?
+
+[source,rust]
+----
+let list = vec![1, 2, 3];
+let doubled: Vec<i32>= list.iter().map(|num| num * 2).collect();
+----
+
+Well, you don't. It turns out that Rust does indeed know the type of its elements, but it has no knowledge of what its new wrapper should be. It's not the `i32` part of the type that Rust needs annotated, it's the `Vec<>` part. Just because we started with a `Vec` doesn't mean we will always want one when we're done.
+
+When Rust knows one type but not another, you can omit it with an underscore (`_`), e.g `Vec<_>`,
+
+[source,rust]
+----
+let doubled: Vec<_>= list.iter().map(|num| num * 2).collect();
+----
+
+
+NOTE: *error[E0596]: cannot borrow `…` as mutable, as it is behind a `&` reference*
+
+[source,rust]
+----
+let list = vec!["garbage".to_owned(), "data".to_owned()];
+list.iter().for_each(|garbage| garbage.clear()); // .clear() mutates its self
+----
+
+[source,output]
+----
+error[E0596]: cannot borrow `*garbage` as mutable, as it is behind a `&` reference
+  --> crates/day-17/iterators/src/main.rs:11:34
+   |
+11 |   list.iter().for_each(|garbage| garbage.clear());
+   |                         -------  ^^^^^^^^^^^^^^^
+   |                                  `garbage` is a `&` reference, so the data it
+   |                                   refers to cannot be borrowed as mutable
+   |                         |
+   |                         help: consider changing this to be a mutable reference: `&mut String`
+
+For more information about this error, try `rustc --explain E0596`.
+----
+
+But _you_ can't change `garbage` to `garbage: &mut String`, it causes a different compile error. This time Rust complains of a signature mismatch on the closure passed `for_each()`.
+
+So what do you do? Instead of `.iter()` you use `.iter_mut()`.
+
+`.iter()` immutably borrows elements, `.iter_mut()` mutably borrows them. When you are confronted with this error in an API you don't control, look for `*_mut()` methods that complement the ones you're already using.
+
+
+== Translating Array.prototype methods
+
+=== `.filter()`
+
+Iterator's `.filter()` method produces another iterator and has some tricky behavior explained in the note below.
+
+[source,ts]
+----
+
+let numbers = [1, 2, 3, 4, 5];
+let even = numbers.filter((x) \=> x % 2 === 0);
+console.log(even);
+
+----
+
+[source,rust]
+----
+
+let numbers = [1, 2, 3, 4, 5];
+let even: Vec<_> = numbers.iter().filter(|x| *x % 2 == 0).collect();
+println!("{:?}", even);
+----
+
+[source,output]
+----
+[2, 4]
+----
+
+NOTE: Did you notice the asterisk (`*`) in front of the `x` in the filter body? That's because `.filter()` takes a reference and most iterators iterate over references so we have to dereference the double reference to get a reference to our integer. Yuck, but that's life. It's https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.filter[documented on Iterator] but it's not an uncommon to find elsewhere.
+
+
+=== `.find()`
+
+`.find(predicate)` is essentially a `.filter(predicate).next()`. It consumes the iterator until your predicate returns true and returns that value.
+
+[source,ts]
+----
+
+let numbers = [1, 2, 3, 4, 5];
+let firstEven = numbers.find((x) \=> x % 2 === 0);
+console.log(firstEven);
+
+----
+
+[source,rust]
+----
+
+let numbers = [1, 2, 3, 4, 5];
+let first_even = numbers.iter().find(|x| *x % 2 == 0);
+println!("{:?}", first_even.unwrap());
+----
+
+[source,output]
+----
+2
+----
+
+NOTE: You can store the iterator and call `.find()` multiple times. You can't do _that_ in JavaScript.
+
+[source,rust]
+----
+let numbers = [1, 2, 3, 4, 5];
+let mut iter = numbers.iter(); // Note, our iter is mut
+let first_even = iter.find(|x| *x % 2 == 0);
+println!("{:?}", first_even.unwrap());
+let second_even = iter.find(|x| *x % 2 == 0);
+println!("{:?}", second_even.unwrap());
+----
+
+[source,output]
+----
+2
+4
+----
+
+
+=== `.forEach()`
+
+`.for_each()` consumes the iterator immediately. You'de use it at the end of an iterator chain to operate on each element. Using a plain loop is usually a more readable option.
+
+[source,ts]
+----
+
+let numbers = [1, 2, 3];
+numbers.forEach((x) \=> console.log(x));
+
+----
+
+[source,rust]
+----
+
+let numbers = [1, 2, 3];
+numbers.iter().for_each(|x| println!("{}", x));
+----
+
+[source,output]
+----
+1
+2
+3
+----
+
+=== `.join()`
+
+`.join()` works on arrays and ``Vec``s without needing an iterator.
+
+[source,ts]
+----
+
+let names = ["Sam", "Janet", "Hunter"];
+let csv = names.join(", ");
+console.log(csv);
+
+----
+
+[source,rust]
+----
+
+let names = ["Sam", "Janet", "Hunter"];
+let csv = names.join(", ");
+println!("{}", csv);
+----
+
+[source,output]
+----
+Sam, Janet, Hunter
+----
+
+=== `.map()`
+
+`.map()` is another `Iterator` method that returns an `Iterator`.
+
+[source,ts]
+----
+
+let list = [1, 2, 3];
+let doubled = list.map((x) \=> x * 2);
+console.log(doubled);
+
+----
+
+[source,rust]
+----
+
+let list = vec![1, 2, 3];
+let doubled: Vec<_> = list.iter().map(|num| num * 2).collect();
+println!("{:?}", doubled)
+----
+
+[source,output]
+----
+[2, 4, 6]
+----
+
+=== `.push() and .pop()`
+
+While you can use `.iter()` on regular arrays, `.push()` and `.pop()` are only available on `Vec` types.
+
+[source,ts]
+----
+
+let list = [1, 2];
+list.push(3);
+console.log(list.pop());
+console.log(list.pop());
+console.log(list.pop());
+console.log(list.pop());
+
+----
+
+[source,sh]
+----
+
+3
+2
+1
+undefined
+----
+
+[source,rust]
+----
+
+let mut list = vec![1, 2];
+list.push(3);
+println!("", list.pop());
+println!("", list.pop());
+println!("", list.pop());
+println!("", list.pop());
+
+----
+
+[source,sh]
+----
+
+Some(3)
+Some(2)
+Some(1)
+None
+----
+
+NOTE: If you use a `VecDeque`, `.push()`/`.pop()` become `.push_back()` and `.pop_back()`
+
+
+=== `.shift() & .unshift()`
+
+You can't get the same behavior as `.shift()` and `.unshift()` with a `Vec`. ``Vec``s only grow from the back. You need a `VecDeque` (Double Ended QUEue) to push/pop from the front of a list.
+
+[source,ts]
+----
+
+let list = [1, 2];
+list.unshift(0);
+console.log(list.shift());
+console.log(list.shift());
+console.log(list.shift());
+console.log(list.shift());
+
+----
+
+[source,sh]
+----
+
+0
+1
+2
+undefined
+----
+
+[source,rust]
+----
+
+let mut list = VecDeque::from([1, 2]);
+list.push_front(0);
+println!("", list.pop_front());
+println!("", list.pop_front());
+println!("", list.pop_front());
+println!("", list.pop_front());
+
+----
+
+[source,sh]
+----
+
+Some(0)
+Some(1)
+Some(2)
+None
+----
+
+=== How to return an Iterator
+
+It's bad form to use `.collect()` to return a specific data structure when you could return the iterator itself. Returning an iterator keeps things flexible and retains the lazy evaluation Rust programmers expect. Since the basic `Iterator` is a trait, we can return it the same way we've returned closures and other values in previous guides.
+
+The data structure below is part of the link:[day-17-names](https://github.com/vinodotdev/node-to-rust/tree/master/src/crates/day-17/names)[day-17-names] example project. It holds its own `Vec` of names and provides a method to search the list.
+
+Rather than returning a `Vec<&String>`, it returns an `Iterator` of borrowed ``String``s.
+
+[source,rust]
+----
+
+struct Names {
+  names: Vec<String>, }
+
+impl Names {
+  fn search<T: AsRef<str>>(&self, re: T) -> impl Iterator<Item = &String> {
+     let regex = regex::Regex::new(re.as_ref()).unwrap();
+     self.names.iter().filter(move |name| regex.is_match(name))
+  }
+}
+----
+
+NOTE: Confused about `AsRef<str>`? Head back to link:./chapter-12-strings-part2.adoc[Chapter 12: Strings, Part 2] to brush up.
+
+
+=== Additional reading
+
+* https://doc.rust-lang.org/book/ch13-02-iterators.html[The Rust Book: ch 13.02 - Iterators]
+* https://doc.rust-lang.org/rust-by-example/flow_control.html[Rust by Example: Flow control]
+* https://doc.rust-lang.org/rust-by-example/std/vec.html[Rust by Example: Vectors]
+* https://doc.rust-lang.org/rust-by-example/trait/iter.html?highlight=iterator#iterators[Rust by Example: Iterators]
+* https://doc.rust-lang.org/std/vec/struct.Vec.html[Rust docs: Vec]
+* https://doc.rust-lang.org/std/collections/vec_deque/struct.VecDeque.html[Rust docs: VecDeque]
+* https://doc.rust-lang.org/std/iter/trait.Iterator.html[Rust docs: Iterator]
+
+== Wrap-up
+
+Porting over our mental model of how lists and iteration works is important. If you subscribe to the functional programming style in JavaScript, you're going to have a great time in Rust. While Rust is not a purely functional language, its default behavior for things like Iterators will net you greater rewards for little effort. Iterators and eventually streams give you more control over how much processing is done and when.

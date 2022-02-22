@@ -1,0 +1,298 @@
+= CLI Arguments and Logging
+
+== Introduction
+
+Today marks the second day of our real Rust project, a command line utility that runs WebAssembly. So far we've hard-coded our file path and we are using `println!()` as basic logging. It's pretty rigid. We need to add flexibility to our foundation before we add more logic.
+
+Rust has you covered with great solutions for CLI args and basic logging. https://docs.rs/structopt/0.3.25/structopt/index.html[`structopt`] makes CLI arguments even easier to manage than any package I've used from npm. https://docs.rs/log/latest/log/[`log`] + https://docs.rs/env_logger/0.9.0/env_logger/[`env_logger`] will give you flexible logging across executables _and_ libraries.
+
+== Adding debug logs
+
+Many node.js libraries depend on the the `debug` npm package for per-library debug logging controlled by an environment variable. Rust has a similar, richer solution. Many Rust crates use the `log` crate for logging and the `env_logger` crate for quick STDOUT output. Having the logging and the output decoupled means that you can freely log from your libraries without caring about the output. The output will only be handled by the end user or product.
+
+This is _huge_. It gives library developers the confidence to log whatever they want without worrying if it meshes with other output.
+
+=== The `log` crate
+
+Let's add the log crate as a dependency to both of our workspace crates:
+
+[source,toml]
+----
+
+[dependencies]
+log = "0.4"
+
+----
+
+Our CLI project should already have our library already listed as dependency and now looks like this:
+
+[source,toml]
+----
+
+[dependencies]
+my-lib = { path = "../my-lib" }
+log = "0.4"
+----
+
+The log crate gives us the `trace!()`,`debug!()`,`warn!()`,`info!()`, and `error!()` macros. You can use each exactly like you use `println!()`, i.e. you use a string with formatting syntax as the first argument and values that implement `Display` or `Debug` et al. Each of the macros logs your message with the relevant log level. This gives your choice of logger better control over what to log where or what to output.
+
+Let's add some log messages to see how this works. In the `lib.rs` for our `my-lib` crate, add a `debug!()` line right at the start of `from_file()`.
+
+[source,rust]
+----
+
+pub fn from_file<T: AsRef<Path>>(path: T) \-> Result<Self, std::io::Error> { debug!("Loading wasm file from {:?}", path.as_ref()); Ok(Self {}) }
+
+----
+
+Now in `main.rs` of our `cli`, change our `println!()` methods to something more appropriate.
+
+[source,rust]
+----
+
+match Module::from_file("./module.wasm") {
+  Ok(_) => {
+      info!("Module loaded");
+  }
+  Err(e) => {
+      error!("Module failed to load: {}", e);
+  }
+}
+----
+
+Now when we run our cli we see... nothing at all.
+
+[source,output]
+----
+$ cargo run -p cli
+$
+----
+
+Which is exactly right! We can freely add log messages anywhere and not worry about clobbering output!
+
+=== Printing our logs with `env_logger`
+
+The `env_logger` crate is a simple way to turn those log commands into useful output.
+
+Add `env_logger` to you `cli` project _only_. You don't want the library printing anything. Log output is strictly for the end product.
+
+[source,toml]
+----
+
+[dependencies]
+my-lib = { path = "../my-lib" }
+log = "0.4"
+env_logger = "0.9"
+
+----
+
+Now we need to initialize our logger as the first thing we do in our `main()`. I added a `debug!()` log following the initialization to make sure we see something:
+
+[source,rust]
+----
+
+fn main() {
+  env_logger::init();
+  debug!("Initialized logger");
+
+// ...
+}
+----
+
+Now when we run our cli we see... nothing at all.
+
+[source,output]
+----
+$ cargo run -p cli
+$
+----
+
+Which is exactly right, again! `env_logger` doesn't output anything by default. It needs to be enabled. You can do this programmatically or via an environment variable named `RUST_LOG` by default.
+
+[source,output]
+----
+$ RUST_LOG=debug cargo run -p cli
+[2021-12-21T02:33:24Z DEBUG cli] Initialized logger
+[2021-12-21T02:33:24Z DEBUG my_lib] Loading wasm file from "./module.wasm"
+[2021-12-21T02:33:24Z INFO  cli] Module loaded
+----
+
+Notice how we see logs from both our CLI and our library crates. You can control the level per-module or globally. If we specify `RUST_LOG=info` we'll only see the info messages.
+
+[source,output]
+----
+$ RUST_LOG=info cargo run -p cli
+[2021-12-21T02:33:24Z INFO  cli] Module loaded
+----
+
+We can use `[package]=[level]` syntax to filter the level per-module, e.g.
+
+[source,output]
+----
+» RUST_LOG=cli=debug cargo run -p cli
+[2021-12-21T02:35:30Z DEBUG cli] Initialized logger
+[2021-12-21T02:35:30Z INFO  cli] Module loaded
+----
+
+
+NOTE: Check out https://docs.rs/env_logger/0.9.0/env_logger/index.html#enabling-logging[env_logger] for more documentation on how to control output via the `RUST_LOG` variable.
+
+
+== Adding CLI Arguments
+
+Now that we can see what's going on in our app, we need it to start pulling in configuration from the command line. https://docs.rs/clap/2.34.0/clap/index.html[`clap`] is an amazing library for configuring CLI arguments and https://docs.rs/structopt/0.3.25/structopt/index.html[`structopt`] makes using clap trivial. `structopt` has _many_ options. All of it feels like magic.
+
+Add `structopt` to your CLI's dependencies:
+
+[source,toml]
+----
+
+[dependencies]
+my-lib = { path = "../my-lib" }
+log = "0.4"
+env_logger = "0.9"
+structopt = "0.3"
+
+----
+
+Using `structopt` revolves around creating a `struct` that derives the `StructOpt` trait:
+
+[source,rust]
+----
+use structopt::StructOpt;
+
+#[derive(StructOpt)]
+struct CliOptions {
+}
+----
+
+Configuring `StructOpt` happens at two levels, globally and per-argument. Global configuration happens with the `structopt` attribute on the struct itself. The code below gives our application a name, a description, and uses clap's `AppSettings` to give our tool's help fancy colors.
+
+[source,rust]
+----
+use structopt::{clap::AppSettings, StructOpt};
+
+#[derive(StructOpt)]
+#[structopt(
+    name = "wasm-runner",
+    about = "Sample project",
+    global_settings(&[
+      AppSettings::ColoredHelp
+    ]),
+)]
+struct CliOptions {}
+----
+
+Give it a try!
+
+[source,output]
+----
+cargo run -p cli -- --help
+wasm-runner 0.1.0
+Sample project
+
+USAGE:
+    cli
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+----
+
+Adding CLI arguments is as easy as adding fields to our struct. Any rustdoc comments (comments starting with three slashes (`///`)) turn into descriptions in your help. The `#[structopt]` attribute takes arguments that control the default value, how its parsed, its environment variable fallback, the short and long form, and much more. If you don't specify a `short` or `long` configuration, then your field is considered a required positional argument.
+
+This code adds one required argument named `file_path`. I could have used a `String` type and used it as a file path, but `structopt` can also preprocess argument values into a more appropriate type by using `parse()` like below:
+
+[source,rust]
+----
+struct CliOptions {
+    /// The WebAssembly file to load.
+    #[structopt(parse(from_os_str))]
+    pub(crate) file_path: PathBuf,
+}
+----
+
+Generating this structure from actual command line options is a one-line chore. The `StructOpt` traits adds a `from_args` function to your struct and you get a fully-hydrated struct as simple as this:
+
+[source,rust]
+----
+let options = CliOptions::from_args();
+----
+
+After adding the above line (line 5) and changing our hard-coded path to use the new `file_path` field in our `CliOptions` struct (line 7), our full `main()` now looks like the code below.
+
+[source,rust]
+----
+
+fn main() {
+  env_logger::init();
+  debug!("Initialized logger");
+
+  let options = CliOptions::from_args();
+
+  match Module::from_file(&options.file_path) {
+    Ok(_) => {
+        info!("Module loaded");
+    }
+    Err(e) => {
+        error!("Module failed to load: {}", e);
+    }
+  }
+}
+----
+
+Our CLI behavior and help output update with no effort:
+
+[source,output]
+----
+$ cargo run -p cli -- --help
+wasm-runner 0.1.0
+Sample project
+
+USAGE:
+    cli <file-path>
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+
+ARGS:
+    <file-path>    The WebAssembly file to load
+----
+
+I've been using the `cargo run` syntax which requires that we pass our binary's flags after `--`. If you run the binary directly then you pass them without the separator, e.g.
+
+[source,console]
+----
+./target/debug/cli --help
+----
+
+== Putting it all together.
+
+Because of our debug logging, we can see our command line argument propagate through our simple app by setting `RUST_LOG`, e.g.
+
+[source,output]
+----
+RUST_LOG=debug ./target/debug/cli ./test_file.wasm
+[2021-12-21T03:08:09Z DEBUG cli] Initialized logger
+[2021-12-21T03:08:09Z DEBUG my_lib] Loading wasm file from "./test_file.wasm"
+[2021-12-21T03:08:09Z INFO  cli] Module loaded
+----
+
+NOTE: `./test_file.wasm` doesn't exist, it's just an arbitrary path. Try omitting it and see what happens.
+
+
+Now we're up and running! Next up we need to figure out this whole WebAssembly thing...
+
+== Additional reading
+
+* https://docs.rs/env_logger/0.9.0/env_logger/[`env_logger`]
+* https://docs.rs/log/latest/log/[`log`]
+* https://docs.rs/structopt/0.3.25/structopt/index.html[`structopt`]
+* https://docs.rs/clap/2.34.0/clap/index.html[`clap`]
+
+== Wrap-up
+
+This is a solid foundation for many small to medium sized Rust projects. Simple debug logging will last you a while. Eventually you may want to log output to rotated files or pipe them to log aggregators and you can scale up to that.
+
+The next topic we tackle will be WebAssembly. More specifically, how to run it and build with it.

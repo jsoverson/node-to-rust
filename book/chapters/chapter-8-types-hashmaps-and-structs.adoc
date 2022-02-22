@@ -1,0 +1,305 @@
+= From objects and classes to HashMaps and structs
+
+== Introduction
+
+In the last chapter we went over some basic differences between JavaScript and Rust and finished with Vectors, the Rust counterpart to JavaScript's arrays. Arrays are a core structure in JavaScript but pale in comparison to the almighty `Object`. The JavaScript `Object` is a _beast_. It takes a hundred concepts and wraps them into one. It could be a map, a dictionary, a tree, a base class, an instance, a bucket for utility functions, and even a serialization format. The next couple sections will unpack the typical use cases of the JavaScript `Object` and translate them to Rust.
+
+NOTE: As we move forward, this guide will start to use more TypeScript than JavaScript. You'll need to have `ts-node` installed (`npm install -g ts-node`) to run the examples. If you want a TypeScript playground, check out my boilerplate project at https://github.com/jsoverson/typescript-boilerplate/[jsoverson/typescript-boilerplate].
+
+
+=== Maps vs Objects
+
+Before ECMAScript 6, JavaScript didn't even have `Map`. It was ``Object``s all the way down. That led a whole generation down the path of treating ``Object``s as ``Map``s and persists today. That's not necessarily a bad thing, but the theme of this guide is: you don't get to magic away the details anymore.
+
+First we need to clarify the difference between a JavaScript `Map` and an `Object`.
+
+A JavaScript `Map` is essentially a key/value store. You store a value under a key (be it a `string` or anything at all) and retrieve that value with the same key.
+
+A JavaScript object is a data structure that has properties (a.k.a. keys) which hold values. You set values via a property (a.k.a key) and retrieve values the same way. While not a term used in JavaScript, an object is a "dictionary." Dictionaries https://en.wikibooks.org/wiki/A-level_Computing/AQA/Paper_1/Fundamentals_of_data_structures/Dictionaries[are described as]:
+
+NOTE: _A dictionary is also called a hash, a map, a hashmap in different programming languages (and an Object in JavaScript). They're all the same thing: a key-value store._
+
+I'm glad I could clear things up for you. I'm kidding, but it's to prove a point so bear with me. In JavaScript, the reason to choose a certain type isn't always clear. You can use `Map` and `Object` interchangeably for many purposes. It's not like that in Rust. We need to separate our use cases before moving on. In short:
+
+When you want a keyed collection of values that all have the same type, you want a `Map` type.
+
+When you want an object that has a known set of properties, you want a more structured data type.
+
+A "Map" is a concept and languages usually have many implementations. We'll talk about the `HashMap` type below. The structured data use case usually falls under the category of a language feature. In Rust's case it's called a `struct`.
+
+== From `Map` to `HashMap`
+
+To store arbitrary values by key, we're going to want a https://doc.rust-lang.org/beta/std/collections/struct.HashMap.html[`HashMap`]. While there are https://doc.rust-lang.org/std/collections/index.html#use-a-btreemap-when[alternatives], don't worry about them yet.
+
+This is how you'd create a `Map` in TypeScript. JavaScript would be identical minus the `<string, string>`.
+
+[source,ts]
+----
+const map = new Map<string, string>();
+
+map.set("key1", "value1");
+map.set("key2", "value2");
+
+console.log(map.get("key1"));
+console.log(map.get("key2"));
+----
+
+In Rust, you would write:
+
+[source,rust]
+----
+use std::collections::HashMap;
+
+fn main() {
+  let mut map = HashMap::new();
+  map.insert("key1", "value1");
+  map.insert("key2", "value2");
+
+  println!("{:?}", map.get("key1"));
+  println!("{:?}", map.get("key2"));
+}
+----
+
+This looks nearly identical but I'd be dishonest if I moved on quickly. When you run the Rust code, the output is:
+
+[source,output]
+----
+Some("value1")
+Some("value2")
+----
+
+Which is _kind of_ what we wanted.
+
+=== `Some()`, `None`, and `Option`
+
+Take a look at that `Some()` craziness. What in the world was that about? `Some` is a variant of the https://doc.rust-lang.org/std/option/enum.Option.html[`Option` enum]. ``Option``s are another way of representing _nothing_ like we talked in link:./chapter-7-syntax-and-language.adoc[Chapter 7: Language Part 1: Syntax & Differences].
+
+NOTE: An enum (short for enumeration) is a bound list of possible values, or variants. JavaScript doesn't have them, but https://www.typescriptlang.org/docs/handbook/enums.html[TypeScript does]. Rust enums are cooler, though.
+
+
+We'll get to enums in time, but think of `Option` as a value that can hold either something or nothing. If we pass a key that doesn't exist in our map, `get()` needs to return _nothing_ but we don't have `undefined` in Rust. We could return the unit type (`()`) but we can't write a function that returns `string | undefined` like we could in TypeScript. Instead, Rust has enums. That's where `Option` comes in. The `Option` enum has two variants, it's either `Some()` or `None`.
+
+
+NOTE: You can test an `Option` with `.is_some()`, or `.is_none()`. You can "unwrap" it with `.unwrap()` which will panic if it's `None`. You can unwrap it safely with `.unwrap_or(default_value)`. See the Rust docs on https://doc.rust-lang.org/std/option/enum.Option.html[Option] for more.
+
+
+We can rewrite the above to clean up the output.
+
+[source,rust]
+----
+use std::collections::HashMap;
+
+fn main() {
+  let mut map = HashMap::new();
+  map.insert("key1", "value1");
+  map.insert("key2", "value2");
+
+  println!("{}", map.get("key1").unwrap_or(&""));
+  println!("{}", map.get("key2").unwrap_or(&""));
+}
+----
+
+NOTE: We _know_ that our map contains values for the keys we specify, so we could have used `.unwrap()` without worrying. If we did however, we wouldn't be able to use it for the example below. Such is the life of example code.
+
+
+Notice how we're using `.unwrap_or(&"")` above, instead of `.unwrap_or("")`. Why? What happens if we write it that way?
+
+[source,output]
+----
+error[E0308]: mismatched types
+ --> crates/day-8/maps/src/main.rs:9:44
+  |
+9 |   println!("{}", map.get("key2").unwrap_or(""));
+  |                                            ^^ expected `&str`, found `str`
+  |
+  = note: expected reference `&&str`
+             found reference `&'static str`
+
+For more information about this error, try `rustc --explain E0308`.
+----
+
+These types of errors can be very confusing. The helper text says rust expected a `&str` but found a `str` and then proceeds to note that it actually expected a `&&str` yet found `&'static str`. I already told you that string literals are the type `&str`, not `str` and never mentioned anything about `'static`. What gives?
+
+Let's break it down.
+
+* First, note that we used string literals for both our HashMap's keys and values. Rust inferred the HashMap's type to be `HashMap<&str, &str>`.
+* Second, `.get()` doesn't return an owned value, it returns a borrowed value. That makes sense, right? If it returned an owned value it would either need to give up its ownership (which would mean removing the value from the map) or it would need to clone it. Cloning means extra cycles and memory which is something Rust will _never_ do for you automatically. So you get a reference to your value, which was already a reference. A reference to a `&str` has a type of `&&str`.
+* Third, `.unwrap_or()` needs to produce the exact same type as the ``Option``'s type. In this case, the option's type is `Option<&&str>`. That is to say, the `Option` can either be a `Some(&&str)` (the return type of `.get()`) or `None`. So we need our `.unwrap_or()` to return a `&&str` which means we need to pass it a `&&str`, or `&""`.
+* Finally, We haven't talked about lifetimes yet but the `'static` is a lifetime. It means that a reference points to data that will last as long as the program does. String literals will last forever (they have a `static` lifetime) because Rust ensures it. Don't worry about it yet, just know that a `&'static str` means that Rust is probably talking about a string literal.
+
+NOTE: So what's that helper text talking about then? I don't know. It looks wrong. I hadn't thought about it much until you asked. You ask great questions.
+
+
+== From objects and classes to ``struct``s
+
+Rust's ``struct``s are as ubiquitous as JavaScript's objects. They are a cross between plain old objects, TypeScript interfaces, and JavaScript classes. While you frequently use a Rust `struct` with methods (e.g. `some_object.to_string()`) which make them feel like normal class instances, it's more helpful to think of ``struct``s as pure data to start. Behavior comes later.
+
+An interface you could write as TypeScript like...
+
+[source,typescript]
+----
+interface TrafficLight {
+  color: string;
+}
+----
+
+...would be written as a `struct` in Rust like this.
+[source,rust]
+----
+struct TrafficLight {
+  color: String,
+}
+----
+
+Instantiating is similar, too:
+
+[source,typescript]
+----
+
+const light: TrafficLight = {
+  color: "red",
+};
+
+----
+
+[source,rust]
+----
+
+let light = TrafficLight {
+  color: "red".to_owned(), // Note we want an owned String
+};
+----
+
+But you probably wouldn't write an interface for this in TypeScript. You'd write a class so it can be instantiated with defaults and have methods, right? Something like:
+
+[source,ts]
+----
+class TrafficLight {
+  color: string;
+
+  constructor() {
+    this.color = "red";
+  }
+}
+
+const light = new TrafficLight();
+----
+
+To do this in Rust, you'd add an implementation to your `struct`.
+
+=== Adding behavior
+
+To add behavior we add an `impl`.
+
+[source,rust]
+----
+
+struct TrafficLight {
+  color: String,
+}
+
+impl TrafficLight {
+  pub fn new() -> Self {
+    Self {
+      color: "red".to_owned(),
+    }
+  }
+}
+----
+
+This adds a public function called `new()` that you can execute to get a new `TrafficLight`. `Self` refers to `TrafficLight` here and you could replace one with the other with no change in behavior. There's nothing special about `new` or how you call it. It's not a keyword like in `JavaScript`. It's convention. Call it via `TrafficLight::new()`, e.g.
+
+[source,rust]
+----
+fn main() {
+  let light = TrafficLight::new();
+}
+----
+
+This works but we can't really verify it. You could try printing it but -- spoiler alert: it won't compile. You can't even use the debug syntax I mentioned in an earlier chapter.
+
+[source,rust]
+----
+fn main() {
+  let light = TrafficLight::new();
+  println!("{}", light);
+  println!("{:?}", light);
+}
+----
+
+Both the display formatter (used by `{}`) and the debug formatter (used by `{:?}`) rely on traits that we don't implement.
+
+Traits are like mixins in JavaScript. They are another way of attaching behavior to data. Traits are a big topic that deserve a whole section, but we can add some simple ones today.
+
+[source,rust]
+----
+impl std::fmt::Display for TrafficLight {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "Traffic light is {}", self.color)
+  }
+}
+----
+
+This implements a trait (`Display` found at `std::fmt::Display`) for our `TrafficLight`. Now we can print our traffic light via `println!()`!
+
+[source,output]
+----
+Traffic light is red
+----
+
+Traits can also have default, derivable implementations. This allows you to generalize behavior and reduce boilerplate. If all the fields in your `struct` implement the `Debug` trait, you can derive it with a single line (`#[derive(Debug)]`) and gain debug output for free.
+
+[source,rust]
+----
+#[derive(Debug)]
+struct TrafficLight {
+  color: String,
+}
+----
+
+The full source now looks like this:
+
+[source,rust]
+----
+fn main() {
+  let light = TrafficLight::new();
+  println!("{}", light);
+  println!("{:?}", light);
+}
+
+impl std::fmt::Display for TrafficLight {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "Traffic light is {}", self.color)
+  }
+}
+
+#[derive(Debug)]
+struct TrafficLight {
+  color: String,
+}
+
+impl TrafficLight {
+  pub fn new() -> Self {
+    Self {
+      color: "red".to_owned(),
+    }
+  }
+}
+----
+
+When you run it, you'll see both our display line and the debug line printed to STDOUT.
+
+[source,output]
+----
+[snipped]
+Traffic light is red
+TrafficLight { color: "red" }
+----
+
+== Wrap-up
+
+``HashMap``s are the key to storing and accessing data with a key/value relationship. We'll touch on them more in an upcoming section on Arrays and Iterators.
+
+Structs are how you bring some of the class behavior to Rust. Simple usage of JavaScript and TypeScript classes is easily portable. Tightly coupled relationships and object-oriented patterns aren't. It'll take some time to get used to traits but the benefits of how you structure your code and logic will transfer back to JavaScript.
+
+Traits are powerful and are what give structs their life. The separation of data and behavior is important and takes some practice getting used to it. We'll go over adding methods and more to our structs in the next chapter.

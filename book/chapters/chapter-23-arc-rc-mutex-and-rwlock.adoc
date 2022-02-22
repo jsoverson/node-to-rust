@@ -1,0 +1,273 @@
+= Cheating The Borrow Checker
+
+== Introduction
+
+Over the last twenty-two days you've gotten comfortable with the basics of Rust. You know that Rust values can only have one owner, you kind of get lifetimes, and you've come to terms with mutability. It's all a bit strange but you accept it. People are making big things with Rust and you trust the momentum. You're ready.
+
+Then you start a project. It goes well at first. You get into a groove and then -- all of a sudden -- you're stopped dead in your tracks. You can't figure out how to satisfy Rust. You've already bent over backwards. You're drowning in references and lifetime annotations. Rust is yelling about `Sync`, `Send`, lifetimes, moved values, what have you. You just want more than one owner or multiple mutable borrows. You're about to give up.
+
+That's where `Rc`, `Arc`, `Mutex`, and `RwLock` come in.
+
+NOTE: Yeah, it's not "cheating the borrow checker," but it feels like it.
+
+
+=== Reference counting in Rust with `Rc` & `Arc`
+
+`Rc` and `Arc` are Rust's reference counted types. That's right. After all the talk about how garbage collectors manage memory by counting references and how Rust uses lifetimes and doesn't need a garbage collector; you can manage memory by counting references.
+
+NOTE: I don't know about you, but my journey through Rust was an emotional tug-of-war. The heavy focus on Rust's lifetimes and borrow checker made it seem like _I_ was wrong when I ran up against it. I felt like I was trying to cheat and kept getting caught. I would refactor and refactor but always end up in the same place.
+
+Turns out I _was_ wrong, but not in the way I thought. My interpretation of Rust docs and articles gave me tunnel vision. I had myself convinced that reference counting was bad so I never looked for it. When I saw it, I assumed it was in a negative context and I skimmed passed. This was only reinforced by seeing recurring references to how you should avoid things like `Rc<RefCell>`. I lost a lot of time. I hope you don't.
+
+
+Consider a situation where you have an value that multiple other structs need to point to. Maybe you're building a game about space pirates that have high-tech treasure maps that always point to a treasure's actual location. Our maps will need a reference to the Treasure at all times. Creating these objects might look like this.
+
+[source,rust]
+----
+let booty = Treasure { dubloons: 1000 };
+
+let my_map = TreasureMap::new(&booty);
+let your_map = my_map.clone();
+----
+
+Our `Treasure` struct is straightforward:
+
+[source,rust]
+----
+#[derive(Debug)]
+struct Treasure {
+    dubloons: u32,
+}
+----
+
+But our `TreasureMap` struct holds a reference and Rust starts yelling about lifetime parameters. A budding Rust developer might accept what they're told to get things compiling. After all: if it compiles, it works. Right?
+
+[source,rust]
+----
+#[derive(Clone, Debug)]
+struct TreasureMap<'a> {
+    treasure: &'a Treasure,
+}
+
+impl<'a> TreasureMap<'a> {
+    fn new(treasure: &'a Treasure) -> Self {
+        TreasureMap { treasure }
+    }
+}
+----
+
+It works! Our code grew a bit and for questionable value, but it works.
+
+[source,rust]
+----
+fn main() {
+    let booty = Treasure { dubloons: 1000 };
+
+    let my_map = TreasureMap::new(&booty);
+    let your_map = my_map.clone();
+    println!("{:?}", my_map);
+    println!("{:?}", your_map);
+}
+
+#[derive(Debug)]
+struct Treasure {
+    dubloons: u32,
+}
+
+#[derive(Clone, Debug)]
+struct TreasureMap<'a> {
+    treasure: &'a Treasure,
+}
+
+impl<'a> TreasureMap<'a> {
+    fn new(treasure: &'a Treasure) -> Self {
+        TreasureMap { treasure }
+    }
+}
+----
+
+[source,output]
+----
+$ cargo run -p day-23-rc-arc --bin references
+[snipped]
+TreasureMap { treasure: Treasure { dubloons: 1000 } }
+TreasureMap { treasure: Treasure { dubloons: 1000 } }
+----
+
+But now everything that uses a `TreasureMap` needs to deal with lifetime parameters...
+
+[source,rust]
+----
+struct SpacePirate<'a> {
+    treasure_maps: Vec<TreasureMap<'a>>,
+}
+impl<'a> SpacePirate<'a> {}
+
+struct SpaceGuild<'a> {
+    pirates: Vec<SpacePirate<'a>>,
+}
+impl<'a> SpaceGuild<'a> {}
+----
+
+If you keep going, you're rewarded with more pain and no perceivable gain.
+
+It's time for `Rc`.
+
+Remember how `Box` essentially gives you an owned reference (see: Chapter 14 : What's a box?)? `Rc` is like a shared `Box`. You can `.clone()` them all day long with every version pointing to the same underlying value. Rust's borrow checker cleans up the memory when the last reference's lifetime ends. It's like a mini garbage collector.
+
+You use `Rc` just as you would `Box`, e.g.
+
+[source,rust]
+----
+
+use std::rc::Rc;
+
+fn main() {
+    let booty = Rc::new(Treasure { dubloons: 1000 });
+
+ let my_map = TreasureMap::new(booty);
+ let your_map = my_map.clone();
+ println!("{:?}", my_map);
+ println!("{:?}", your_map); }
+
+#[derive(Debug)]
+struct Treasure {
+    dubloons: u32,
+}
+
+#[derive(Clone, Debug)]
+struct TreasureMap {
+    treasure: Rc<Treasure>, }
+
+impl TreasureMap {
+    fn new(treasure: Rc<Treasure>) \-> Self { TreasureMap { treasure } } }
+
+----
+
+`Rc` does not work across threads. That is, `Rc` is `!Send` (See: [Chapter 18: Send + Sync](/blog/node-to-rust-day-18-async/#send-sync)). If we try to run code that sends a `TreasureMap` to another thread, Rust will yell at us.
+
+[source,rust]
+----
+
+fn main() {
+    let booty = Rc::new(Treasure { dubloons: 1000 });
+
+    let my_map = TreasureMap::new(booty);
+
+    let your_map = my_map.clone();
+    let sender = std::thread::spawn(move || {
+        println!("Map in thread {:?}", your_map);
+    });
+    println!("{:?}", my_map);
+
+    sender.join();
+}
+----
+
+[source,output]
+----
+[snipped]
+error[E0277]: `Rc<Treasure>` cannot be sent between threads safely
+   --> crates/day-23/rc-arc/./src/rc.rs:9:18
+    |
+9   |       let sender = std::thread::spawn(move || {
+    |  __________________^^^^^^^^^^^^^^^^^^_-
+    | |                  |
+    | |                  `Rc<Treasure>` cannot be sent between threads safely
+10  | |         println!("Map in thread {:?}", your_map);
+11  | |     });
+    | |_____- within this `[closure@crates/day-23/rc-arc/./src/rc.rs:9:37: 11:6]`
+[snipped]
+----
+
+`Arc` is the `Send` version of `Rc`. It stands for "Atomically Reference Counted" and all you need to know is that it handles what `Rc` can't, with slightly greater overhead.
+
+NOTE: When Rust documentation refers to "additional overhead" for a feature you need, just take it. You come from JavaScript, don't fret about "overhead."
+
+
+`Arc` is a drop-in replacement for `Rc` in read-only situations. If you need to alter the held value, that's a different story. Mutating values across threads requires a lock. Attempting to mutate an `Arc` will give you errors like:
+
+[source,console]
+----
+error[E0596]: cannot borrow data in an `Arc` as mutable
+
+or
+
+error[E0594]: cannot assign to data in an `Arc`
+----
+
+== `Mutex` & `RwLock`
+
+If `Arc` is the answer to you needing `Send`. `Mutex` and `RwLock` are your answers to needing `Sync`.
+
+`Mutex` (Mutual Exclusion) provides a lock on an object that guarantees _only one_ access to read _or_ write at a time. `RwLock` allows for _many reads_ but _at most one write_ at a time. ``Mutex``es are cheaper than ``RwLock``s, but are more restrictive.
+
+With an `Arc<Mutex>` or `Arc<RwLock>`, you can mutate data safely across threads. Before we start going into `Mutex` and `RwLock` usage, it's worth talking about `parking_lot`.
+
+=== `parking_lot`
+
+The https://docs.rs/parking_lot/latest/parking_lot/index.html[`parking_lot`] crate offers several replacements for Rust's own sync types. It promises faster performance and smaller size but the most important feature in my opinion is they doesn't require managing a `Result`. Rust's `Mutex` and `RwLock` return a `Result` which is unwelcome noise if we can avoid it.
+
+=== Locks and guards
+
+When you lock a `Mutex` or `RwLock` you take ownership of a guard value. You treat the guard like your inner type, and when you drop the guard you drop the lock. You can drop a guard explictly via `drop(guard)` or let it drop naturally when it goes out of scope. When dealing with locks you should get into the practice of dropping them ASAP, lest you run into a deadlock situation where two threads hold locks the other is waiting on.
+
+Rust's blocks make it easy to limit a guard's scope and have them drop automatically when you are done with them. The code sample below uses a block to scope the guard from `treasure.write()` so that it automatically drops at the end of the block (line 8)
+
+[source,rust]
+----
+
+fn main() {
+  let treasure = RwLock::new(Treasure { dubloons: 1000 });
+
+{
+      let mut lock = treasure.write();
+      lock.dubloons = 0;
+      println!("Treasure emptied!");
+  }
+
+println!("Treasure: {:?}", treasure);
+}
+
+----
+
+== Async
+
+Async Rust and futures add another wrench into the lock and guard problem. It's easy to write code that holds a guard across an async boundary, e.g.
+
+[source,rust]
+----
+
+#[tokio::main]
+async fn main() {
+    let treasure = RwLock::new(Treasure { dubloons: 100 });
+    tokio::task::spawn(empty_treasure_and_party(&treasure)).await;
+}
+
+async fn empty_treasure_and_party(treasure: &RwLock<Treasure>) {
+  let mut lock = treasure.write();
+  lock.dubloons = 0;
+
+  // Await an async function
+  pirate_party().await;
+
+} // lock goes out of scope here
+
+async fn pirate_party() {}
+----
+
+The best solution is to not do this. Drop your lock before you await. If you can't avoid this situation, `tokio` does have its own https://docs.rs/tokio/1.15.0/tokio/sync/index.html[sync types]. Use them as a last resort. It's not about performance (though there is that "overhead" again), it's a matter of adding complexity and cycles for a situation you can (or should) get out of.
+
+== Additional reading
+
+* https://doc.rust-lang.org/std/rc/index.html[`std::rc`]
+* https://doc.rust-lang.org/std/rc/struct.Rc.html[`std::rc::Rc`]
+* https://doc.rust-lang.org/std/sync/struct.Arc.html[`std::sync::Arc`]
+* https://doc.rust-lang.org/std/sync/struct.Mutex.html[`std::sync::Mutex`]
+* https://doc.rust-lang.org/std/sync/struct.RwLock.html[`std::sync::RwLock`]
+* https://docs.rs/parking_lot/latest/parking_lot/index.html[`parking_lot`]
+* https://docs.rs/tokio/1.15.0/tokio/sync/index.html[`Tokio Sync`]
+
+== Wrap-up
+
+`RwLock` and `Mutex` (along with types like https://doc.rust-lang.org/std/cell/struct.RefCell.html[`RefCell`]) give you the flexibility to mutate inner fields of a immutable struct safely, even across threads. `Arc` and `Rc` were major keys to me understanding how to use real Rust. I overused each of these types when I started using them. I don't regret it one bit. If you take away only one thing from this book, let it be that you need to do what works for you. If you keep trying you can always improve, but you won't get anywhere if you're so frustrated you give up.

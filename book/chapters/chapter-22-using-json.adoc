@@ -1,0 +1,237 @@
+= Handling JSON
+
+== Introduction
+
+JavaScript without JSON is unthinkable. JSON is the famous, loosely structured data format that -- at its core -- is just a JavaScript object. It's easy to create, serialize to, and deserialize from. It's so simple that JavaScript developers (myself included) frequently don't even bother associating JSON with a formal structure. We test for undefined values or nonexistent keys like it's normal.
+
+Well for Rust and other typed languages, it's not normal. They need structure. You can represent JSON as the types represented in the https://www.ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf[spec], but that turns JSON into the worst of every world. It lacks meaningful types that play well in typed languages, and it's neither simple nor satisfying to use.
+
+What we need is a way to translate JSON into something like a JavaScript object, except in Rust. We need to translate JSON to a struct.
+
+== Enter `serde`
+
+https://serde.rs/[`serde`] (short for **Ser**ialization/**De**serialization) is a magical crate. With a single line of code, you can serialize your data structures to and from dozens of formats. Serde itself provides the `Serialize` and `Deserialize` traits that let you define how a data structure should be serialized. It doesn't actually serialize anything. That's what other crates are for. We've already used one such crate, `rmp-serde`, to encode data into the MessagePack format. We didn't need to know anything about `serde` because we were serializing common structures. If we want to make anything new, then we must implement the traits.
+
+Luckily, `serde` makes this easy with its `derive` feature. You can get away with serializing most things automatically by deriving `Serialize` and/or `Deserialize` like this:
+
+[source,rust]
+----
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
+struct Author {
+    first: String,
+    last: String,
+}
+----
+
+Once you've implemented one or both traits, you get automagic support for any format in the `serde` ecosystem.
+
+The code below derives ``serde``'s `Deserialize` and `Serialize` traits and uses `serde_json` & `rmp-serde` to transform a structure to and from JSON and MessagePack.
+
+NOTE: Notice how we explicitly specify the types we deserialize into on lines 20 & 22. This is the only way the deserializer will know what to output.
+
+
+[source,rust]
+----
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Author {
+    first: String,
+    last: String,
+}
+
+fn main() {
+    let mark_twain = Author {
+        first: "Samuel".to_owned(),
+        last: "Clemens".to_owned(),
+    };
+
+
+    let serialized_json = serde_json::to_string(&mark_twain).unwrap();
+    println!("Serialized as JSON: {}", serialized_json);
+    let serialized_mp = rmp_serde::to_vec(&mark_twain).unwrap();
+    println!("Serialized as MessagePack: {:?}", serialized_mp);
+
+    let deserialized_json: Author = serde_json::from_str(&serialized_json).unwrap();
+    println!("Deserialized from JSON: {:?}", deserialized_json);
+    let deserialized_mp: Author = rmp_serde::from_read_ref(&serialized_mp).unwrap();
+    println!("Deserialized from MessagePack: {:?}", deserialized_mp);
+}
+----
+
+[source,output]
+----
+$ cargo run -p day-22-serde
+[snipped]
+Serialized as JSON: {"first":"Samuel","last":"Clemens"}
+Serialized as MessagePack: [146, 166, 83, 97, 109, 117, 101, 108, 167, 67, 108, 101, 109, 101, 110, 115]
+Deserialized from JSON: Author { first: "Samuel", last: "Clemens" }
+Deserialized from MessagePack: Author { first: "Samuel", last: "Clemens" }
+----
+
+== Extending our CLI
+
+NOTE: This project builds off the previous three days. It's not critical that you have the foundation to make use of the code here, but it helps.
+
+
+The last chapter's CLI executed waPC WebAssembly modules that had a very strict signature. Today we're going to extend it to accept arbitrary input and output values represented as JSON.
+
+Add `serde_json` to our CLI's `Cargo.toml`. We don't need `serde` here. I'll go over why below.
+
+[source,rust]
+----
+
+[dependencies]
+my-lib = { path = "../my-lib" }
+log = "0.4"
+env_logger = "0.9"
+structopt = "0.3"
+rmp-serde = "0.15"
+anyhow = "1.0"
+serde_json = "1.0"
+
+----
+
+== Representing arbitrary JSON
+
+Using custom structs is fine when we know what we're representing, but sometimes we don't. Sometimes we need to pass along or translate data structures as an intermediary broker. In that case we need more generic representations. `serde_json`'s internal representation of JSON is captured in the `serde_json::Value` enum. Rather than create a new struct that derives `Serialize` and `Deserialize` and represents JSON's circular type structure, we can use `serde_json::Value`. This keeps the structure of the JSON in a generic, intermediary format that we can pass along or translate to other formats.
+
+Before we do that though, let's change our CLI argument from passed JSON data to a file path where we can find the JSON.
+
+[source,rust]
+----
+
+struct CliOptions {
+    /// The WebAssembly file to load.
+    #[structopt(parse(from_os_str))]
+    pub(crate) file_path: PathBuf,
+
+    /// The operation to invoke in the WASM file.
+    #[structopt()]
+    pub(crate) operation: String,
+
+    /// The path to the JSON data to use as input.
+    #[structopt(parse(from_os_str))]
+    pub(crate) json_path: PathBuf,
+}
+----
+
+Now that we have a file, we need to read it. We used `fs::read` to read our WASM file in as bytes, we can use `fs::read_to_string` to read a file in as a `String`.
+
+[source,rust]
+----
+fn run(options: CliOptions) -> anyhow::Result<String>{
+  // snipped
+
+  let json = fs::read_to_string(options.json_path)?;
+
+  // snipped
+}
+----
+
+
+We use `serde_json::from_str` to parse the JSON into a `serde_json::Value`:
+
+[source,rust]
+----
+
+fn run(options: CliOptions) -> anyhow::Result<String> {
+  // snipped
+
+  let json = fs::read_to_string(options.json_path)?;
+  let data: serde_json::Value = serde_json::from_str(&json)?;
+  debug!("Data: {:?}", data);
+
+  // snipped
+}
+----
+
+Lastly, we change our return type and the deserialization type to `serde_json::Value` so we can represent the output as JSON in turn.
+
+[source,rust]
+----
+fn run(options: CliOptions) -> anyhow::Result<serde_json::Value> {
+    let module = Module::from_file(&options.file_path)?;
+    info!("Module loaded");
+
+    let json = fs::read_to_string(options.json_path)?;
+    let data: serde_json::Value = serde_json::from_str(&json)?;
+    debug!("Data: {:?}", data);
+
+    let bytes = rmp_serde::to_vec(&data)?;
+
+    debug!("Running  {} with payload: {:?}", options.operation, bytes);
+    let result = module.run(&options.operation, &bytes)?;
+    let unpacked: serde_json::Value = rmp_serde::from_read_ref(&result)?;
+
+    Ok(unpacked)
+}
+----
+
+And we're done! We can run our test file from the last chapter after putting the input into a JSON file:
+
+[source,output]
+----
+cargo run -p cli -- crates/my-lib/tests/test.wasm hello hello.json
+[snipped]
+"Hello, Potter."
+----
+
+But now you can run arbitrary, waPC-compliant WebAssembly modules and parse the output as JSON. Today's project includes a module that produces HTML output from a handlebars template and a `Blog`-style type that includes a title, author, and body.
+
+[source,output]
+----
+$ cargo run -p cli -- ./blog.wasm render ./blog.json
+[snipped]
+"<html><head><title>The Adventures of Tom Sawyer</title></head><body><h1>The Adventures of Tom Sawyer</h1><h2>By Mark Twain</h2><p>“TOM!”\n\nNo answer.\n\n“TOM!”\n\nNo answer.\n\n“What’s gone with that boy,  I wonder? You TOM!”\n\nNo answer.</p></body></html>"
+----
+
+Our CLI is getting useful. It's about time we name it something better than `cli`. The binary takes on the name of the crate unless overridden. Change it to something appropriate like `wapc-runner` in `Cargo.toml`.
+
+[source,rust]
+----
+
+[package]
+name = "wapc-runner"
+
+----
+
+We've also been running our debug builds up to now. Try building the binary in release mode to see what your end product looks like.
+
+WARNING: Building in release mode may take a _lot_ longer, depending on the machine you are building on.
+
+[source,sh]
+----
+
+$ cargo build --release
+[snipped]
+    Finished release [optimized] target(s) in 6m 08s
+$ cp ./target/release/wapc-runner .
+$ ./wapc-runner ./blog.wasm render ./blog.json
+"<html><head><title>The Adventures of Tom Sawyer</title></head><body><h1>The Adventures of Tom Sawyer</h1><h2>By Mark Twain</h2><p>“TOM!”\n\nNo answer.\n\n“TOM!”\n\nNo answer.\n\n“What’s gone with that boy,  I wonder? You TOM!”\n\nNo answer.</p></body></html>"
+----
+
+NOTE: Note, `wasmtime` performance is great with already-loaded modules, but the startup time is noticeable. You can reduce this substantially by using its `cache` feature which caches an intermediary representation for speedier startup.
+
+
+And now we have a portable WebAssembly executor that runs waPC modules on the command line. That's pretty awesome.
+
+If you're looking for ideas on where to go next:
+
+. Take JSON data from STDIN when the file argument is missing so you can `cat` JSON to your binary. (Hint, the `atty` crate will help you determine if your process is being piped to or is interactive)
+. Decouple the template from the JSON for the blog module and take an optional template from a file. A `.hbs` file is included in the project repo. (Hint: An optional file path argument should probably be `Option<PathBuf>`)
+
+== Additional reading
+
+* https://serde.rs[`serde`]
+* https://docs.serde.rs/serde_json/[`serde_json`]
+* https://docs.rs/rmp-serde/latest/rmp_serde/[`rmp-serde`]
+* https://docs.rs/handlebars/4.1.6/handlebars/index.html[`handlebars`]
+* https://www.gutenberg.org/files/74/74-h/74-h.htm[`The Adventures of Tom Sawyer`]
+
+== Wrap-up
+
+We just built a pretty heavy CLI application in surprisingly little code. Well, I hope you're surprised. Once you get passed some of the early hurdles and find ways to mitigate the verbosity of Rust's quirks, you can deliver a big impact just as easy as if you were writing JavaScript. `StructOpt` and `serde` are only a few of the amazing crates you can find on `crates.io`. There are many others and opportunities for many more. All Rust needs are some motivated new developers who come from a rich ecosystem of small modules. _Hint hint..._

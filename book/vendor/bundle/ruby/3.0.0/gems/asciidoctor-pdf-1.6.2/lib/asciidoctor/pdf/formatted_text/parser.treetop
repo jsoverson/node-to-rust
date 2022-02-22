@@ -1,0 +1,131 @@
+# frozen_string_literal: true
+module Asciidoctor
+module PDF
+module FormattedText
+grammar Markup
+  rule text
+    complex
+  end
+
+  rule complex
+    (cdata / element / charref)* {
+      def content
+        elements.map {|e| e.content }
+      end
+    }
+  end
+
+  rule element
+    # strict tag matching (costs a minor toll)
+    # void_element / start_tag complex end_tag &{|seq| seq[0].name == seq[2].name } {
+
+    void_element / start_tag complex end_tag {
+      # NOTE content only applies to non-void elements (second part of rule)
+      def content
+        { type: :element, name: (tag_element = elements[0]).name.to_sym, attributes: tag_element.attributes, pcdata: elements[1].content }
+      end
+    }
+  end
+
+  rule void_element
+    '<' void_tag_name attributes (spaces? '/')? '>' {
+      def content
+        { type: :element, name: elements[1].text_value.to_sym, attributes: elements[2].content }
+      end
+    }
+  end
+
+  rule start_tag
+    '<' tag_name attributes '>' {
+      def name
+        elements[1].text_value
+      end
+
+      def attributes
+        elements[2].content
+      end
+    }
+  end
+
+  rule tag_name
+    # QUESTION faster to do regex?
+    # QUESTION what about supporting hr?
+    'a' / 'strong' / 'em' / 'code' / 'color' / 'font' / 'span' / 'button' / 'key' / 'sup' / 'sub' / 'mark' / 'del'
+  end
+
+  rule void_tag_name
+    'br' / 'img'
+  end
+
+  rule attributes
+    attribute* {
+      def content
+        attrs = {}
+        elements.each {|e|
+          attr_name, attr_val = e.content
+          attrs[attr_name.to_sym] = attr_val
+        }
+        attrs
+      end
+    }
+  end
+
+  rule attribute
+    spaces [a-z_]+ '=' '"' [^"]* '"' {
+      def content
+        [elements[1].text_value, elements[4].text_value]
+      end
+    }
+  end
+
+  rule end_tag
+    '</' tag_name '>' {
+      def name
+        elements[1].text_value
+      end
+    }
+  end
+
+  rule cdata
+    [^<&]+ {
+      def content
+        { type: :text, value: text_value }
+      end
+    }
+  end
+
+  rule charref
+    '&' ('#' character_decimal / '#x' character_hex / character_name) ';' {
+      def content
+        if (ref_data = elements[1]).terminal?
+          { type: :charref, reference_type: :name, value: ref_data.text_value.to_sym }
+        elsif ref_data.elements[0].text_value == '#'
+          { type: :charref, reference_type: :decimal, value: ref_data.elements[1].text_value.to_i }
+        else
+          { type: :charref, reference_type: :hex, value: ref_data.elements[1].text_value }
+        end
+      end
+    }
+  end
+
+  rule character_decimal
+    # NOTE 6 decimals only supported in Asciidoctor 1.5.5 and up
+    [0-9] 2..6
+  end
+
+  rule character_hex
+    # NOTE 5 hexadecimals only supported in Asciidoctor 1.5.5 and up
+    [0-9a-f] 2..5
+  end
+
+  rule character_name
+    'amp' / 'apos' / 'gt' / 'lt' / 'nbsp' / 'quot'
+  end
+
+  rule spaces
+    ' '+
+  end
+end
+end
+end
+end

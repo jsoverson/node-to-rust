@@ -1,0 +1,93 @@
+= Installing rust with `rustup`
+
+https://github.com/nvm-sh/nvm[nvm] (or https://github.com/coreybutler/nvm-windows[nvm-windows]) are indispensible tools. They manage seamlessly installing and switching between versions of node.js on the same system.
+
+The equivalent in Rust's world is https://rustup.rs/[rustup].
+
+Rustup manages your Rust installation as well as additonal targets (like WebAssembly) and core tools like `cargo` (Rust's `npm`), `clippy` (Rust's `eslint`), `rustfmt` (Rust's `prettier`).
+
+After installing `rustup`, run it without any subcommands and explore what it has to offer.
+
+[source,text]
+----
+$ rustup
+rustup 1.24.3 (ce5817a94 2021-05-31)
+The Rust toolchain installer
+
+USAGE:
+    rustup [FLAGS] [+toolchain] <SUBCOMMAND>
+
+FLAGS:
+    -v, --verbose    Enable verbose output
+    -q, --quiet      Disable progress output
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+
+ARGS:
+    <+toolchain>    release channel (e.g. +stable) or custom toolchain to set override
+
+SUBCOMMANDS:
+    show           Show the active and installed toolchains or profiles
+    update         Update Rust toolchains and rustup
+    check          Check for updates to Rust toolchains and rustup
+    default        Set the default toolchain
+    toolchain      Modify or query the installed toolchains
+    target         Modify a toolchain's supported targets
+    component      Modify a toolchain's installed components
+    override       Modify directory toolchain overrides
+    run            Run a command with an environment configured for a given toolchain
+    which          Display which binary will be run for a given command
+    doc            Open the documentation for the current toolchain
+    man            View the man page for a given command
+    self           Modify the rustup installation
+    set            Alter rustup settings
+    completions    Generate tab-completion scripts for your shell
+    help           Prints this message or the help of the given subcommand(s)
+
+DISCUSSION:
+    Rustup installs The Rust Programming Language from the official
+    release channels, enabling you to easily switch between stable,
+    beta, and nightly compilers and keep them updated. It makes
+    cross-compiling simpler with binary builds of the standard library
+    for common platforms.
+
+    If you are new to Rust consider running `rustup doc --book` to
+    learn Rust.
+----
+
+`rustup show` will show you what is currently installed.
+
+`rustup completions` will help you enable CLI autocompletion for tools like `rustup` and `cargo`.
+
+`rustup component` lets you add additonal components.
+
+`rustup update` will update you to the latest version.
+
+`rustup install stable|nightly|1.57` will install a specific version or the latest stable/nightly versions.
+
+By default, rustup will install the latest version of `rust` and `cargo` and you should be ready to go right away. Give it a shot with.
+
+[source,sh]
+----
+$ rustc --version
+rustc 1.57.0 (59eed8a2a 2021-11-01)
+
+$ cargo --version
+cargo 1.56.0 (4ed5d137b 2021-10-04)
+----
+
+If it doesn't work, you may need to restart your shell to update your PATH.
+
+== `rust-toolchain.toml`
+
+Specifying your toolchain with rustup is easy enough. As you get deeper, you may get into configurations where different projects require different toolchains or Rust versions. That's where `rust-toolchain.toml` comes into play. Specify your project's required toolchain, targets, and supporting tools here so that `cargo` and `rustup` can work automagically, e.g.
+
+`toml {title = "rust-toolchain.toml"}
+[toolchain]
+channel = "1.56.0"
+components = [ "rustfmt", "clippy" ]
+`
+
+== Next steps
+
+Next up we'll take a look at `cargo`, Rust's `npm` and the additional tools that will help reach parity with common workflows: link:./chapter-2-cargo.adoc[Chapter 2: From npm to cargo].

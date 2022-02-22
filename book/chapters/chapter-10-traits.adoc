@@ -1,0 +1,322 @@
+= From Mixins to Traits
+
+== Introduction
+
+Traits are Rust's answer to reusable behavior. They're similar to JavaScript mixins and the mixin pattern. If you're not familiar with JavaScript mixins, it's no more than adding a collection of methods to arbitrary objects. It "mixes in" properties from one object into another, often using `Object.assign()`. e.g.
+
+[source,js]
+----
+const utilityMixin = {
+  prettyPrint() {
+    console.log(JSON.stringify(this, null, 2));
+  },
+};
+
+class Person {
+  constructor(first, last) {
+    this.firstName = first;
+    this.lastName = last;
+  }
+}
+
+function mixin(base, mixer) {
+  Object.assign(base.prototype, mixer);
+}
+
+mixin(Person, utilityMixin);
+
+const author = new Person("Jarrod", "Overson");
+author.prettyPrint();
+----
+
+The above declares a class named `Person` and a plain ol' JavaScript object called `utilityMixin`. The `mixin()` function uses `Object.assign()` to add all the properties from `utilityMixin` to ``Person``'s prototype, thus making them available to every instance of `Person`. It's a useful pattern. It's an option that sidesteps long prototype chains or general-purpose classes.
+
+The above is JavaScript. You can use https://www.typescriptlang.org/docs/handbook/mixins.html[mixins in TypeScript], but it's more complicated. It highlights how being "Just JavaScript, with types" starts to break down.
+
+Rust's traits are very similar to JavaScript's mixins. They're a collection of methods (or method signatures). A lot of documentation compares structs and traits to object oriented paradigms and inheritance. Ignore all of that. It only makes traits harder to understand.
+
+Traits are just a collection of methods.
+
+=== Stretching our TrafficLight example
+
+In the previous days, we added a `get_state()` method to our `TrafficLight` struct. We're rapidly becoming experts in lighting management. It's a perferct time to start adding functionality for every light we have. The first light to add is a simple household bulb. It doesn't do much. It's either on or off.
+
+There should be no surprises in the implementation.
+
+[source,rust]
+----
+#[derive(Debug)]
+struct HouseLight {
+  on: bool,
+}
+
+impl Display for HouseLight {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "Houselight is {}", if self.on { "on" } else { "off" })
+  }
+}
+
+impl HouseLight {
+  pub fn new() -> Self {
+    Self { on: false }
+  }
+  pub fn get_state(&self) -> bool {
+    self.on
+  }
+}
+----
+
+Now let's make a generic `print_state()` function. We want a function that prints the state of any light we pass to it.
+
+[source,rust]
+----
+fn print_state(light: ???) {
+}
+----
+
+But what do we take in? We can't take in an arbitrary list of types like we can in TypeScript. We can't write
+
+[source,typescript]
+----
+function print(light: TrafficLight | HouseLight) {...}
+----
+
+In the last chapter I talked about enums as one way Rust deals with the lack of union types. Another way is with traits. The difference is what we're looking for, the type or a subset of the behavior.
+
+In this example, we don't actually care what kind of light we take in. We only want to query for its name and state. We only want a subset of behavior.
+
+That's where traits come in.
+
+=== Traits
+
+Trait definitions start with the `trait` keyword and are structured similarly to ``impl``s. They consist of methods that look almost identical to what we'd write in an actual `impl`. The one major difference is that you can write trait methods that are missing a body.
+
+
+NOTE: Trait methods can include a method body which acts as a default implementation. Implementers can choose to override the default implementation.
+
+
+Let's call this trait `Light` and started filling it out with a `get_name()` method.
+
+[source,rust]
+----
+trait Light {
+  fn get_name(&self) -> &str;
+}
+----
+
+To implement a trait we use `impl` block like we did for our `struct`. This time though, we write `impl [trait] for [struct]` and we're limited to the methods available on the trait.
+
+[source,rust]
+----
+impl Light for HouseLight {
+  fn get_name(&self) -> &str {
+    "House light"
+  }
+}
+
+impl Light for TrafficLight {
+  fn get_name(&self) -> &str {
+    "Traffic light"
+  }
+}
+----
+
+Now we can start to implement a `print_state()` function. To accept an argument that implements a trait you write `impl [trait]`.
+
+[source,rust]
+----
+fn print_state(light: &impl Light) {
+  println!("{}", light.get_name());
+}
+----
+
+When we try to migrate our `get_state()` methods over to the trait, we run into a snag. Each of the light's state has different types. Since we are printing them with the debug formatter right now, your first thought might be to translate what we just did like this:
+
+[source,rust]
+----
+trait Light {
+  fn get_name(&self) -> &str;
+  fn get_state(&self) -> impl std::fmt::Debug;
+}
+----
+
+But that won't work. Rust complains with the error `impl `Trait` not allowed outside of function and method return types`.
+
+[source,output]
+----
+error[E0562]: `impl Trait` not allowed outside of function and method return types
+  --> crates/day-10/traits/src/main.rs:17:27
+   |
+17 |   fn get_state(&self) -> impl std::fmt::Debug;
+   |                           ^^^^^^^^^^^^^^^^^^^^
+
+For more information about this error, try `rustc --explain E0562`.
+----
+
+But... we _are_ trying to use it as a method return type... What gives?
+
+=== `impl` vs `dyn`
+
+To use traits here we need to use `dyn [trait]`. Using `dyn [trait]` vs `impl [trait]` is a matter of whether or not Rust needs or is able to know a value's concrete type at compile time. We can't use `impl std::fmt::Debug` here because every implementation might return a different actual type. Using `dyn` is like crossing a barrier where you trade optimizations for flexibility. Once a value crosses the `dyn` barrier, it loses its type information and is essentially just a blob of data and a pointer to the methods on a trait.
+
+So we change our signature and implementations to:
+
+[source,rust]
+----
+trait Light {
+  fn get_name(&self) -> &str;
+  fn get_state(&self) -> &dyn std::fmt::Debug;
+}
+
+impl Light for HouseLight {
+  fn get_name(&self) -> &str {
+    "House light"
+  }
+
+  fn get_state(&self) -> &dyn std::fmt::Debug {
+    &self.on
+  }
+}
+
+impl Light for TrafficLight {
+  fn get_name(&self) -> &str {
+    "Traffic light"
+  }
+
+  fn get_state(&self) -> &dyn std::fmt::Debug {
+    &self.color
+  }
+}
+----
+
+
+NOTE: Rust must know the size of everything at compile time. It can't do that with `dyn [trait]` values because they don't have a concrete type. With no known size, it's "unsized." What _is_ sized is a reference. A reference to a `dyn [trait]`, i.e. `&dyn [trait]` is OK.
+
+
+Our full code now looks like this:
+
+[source,rust]
+----
+use std::fmt::Display;
+
+fn main() {
+  let traffic_light = TrafficLight::new();
+  let house_light = HouseLight::new();
+
+  print_state(&traffic_light);
+  print_state(&house_light);
+}
+
+fn print_state(light: &impl Light) {
+  println!("{}'s state is : {:?}", light.get_name(), light.get_state());
+}
+
+trait Light {
+  fn get_name(&self) -> &str;
+  fn get_state(&self) -> &dyn std::fmt::Debug;
+}
+
+impl Light for HouseLight {
+  fn get_name(&self) -> &str {
+    "House light"
+  }
+
+  fn get_state(&self) -> &dyn std::fmt::Debug {
+    &self.on
+  }
+}
+
+impl Light for TrafficLight {
+  fn get_name(&self) -> &str {
+    "Traffic light"
+  }
+
+  fn get_state(&self) -> &dyn std::fmt::Debug {
+    &self.color
+  }
+}
+
+impl std::fmt::Display for TrafficLight {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "Traffic light is {}", self.color)
+  }
+}
+
+#[derive(Debug)]
+struct TrafficLight {
+  color: TrafficLightColor,
+}
+
+impl TrafficLight {
+  pub fn new() -> Self {
+    Self {
+      color: TrafficLightColor::Red,
+    }
+  }
+
+  pub fn turn_green(&mut self) {
+    self.color = TrafficLightColor::Green
+  }
+}
+
+#[derive(Debug)]
+enum TrafficLightColor {
+  Red,
+  Yellow,
+  Green,
+}
+
+impl Display for TrafficLightColor {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let color_string = match self {
+      TrafficLightColor::Green => "green",
+      TrafficLightColor::Red => "red",
+      TrafficLightColor::Yellow => "yellow",
+    };
+    write!(f, "{}", color_string)
+  }
+}
+
+#[derive(Debug)]
+struct HouseLight {
+  on: bool,
+}
+
+impl Display for HouseLight {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "Houselight is {}", if self.on { "on" } else { "off" })
+  }
+}
+
+impl HouseLight {
+  pub fn new() -> Self {
+    Self { on: false }
+  }
+}
+----
+
+Which outputs
+
+[source,output]
+----
+[snipped]
+Traffic light's state is : Red
+House light's state is : false
+----
+
+The output isn't stellar but we can work on that another time. Our code is getting pretty big to sit in one file now. It's time to start cutting it up.
+
+=== Additional reading
+
+* https://doc.rust-lang.org/book/ch10-02-traits.html[The Rust Book: ch 10.02]
+* https://doc.rust-lang.org/rust-by-example/trait.html[Rust by Example: Traits]
+* https://stevedonovan.github.io/rustifications/2018/09/08/common-rust-traits.html[Common Rust Traits]
+* https://doc.rust-lang.org/reference/items/traits.html[The Rust Reference: Traits]
+
+== Wrap-up
+
+Traits are _everywhere_ in Rust and it's worth reading Rust code on Github or in the standard library. Some languages (Go, notably) are very straightforward and clear. There is generally one "right" way to do something. Rust is anything but that. There are 800 different ways to do everything and its important to read existing code rather than work in a vacuum.
+
+NOTE: Having 800 ways to do any one thing makes Rust the spiritual successor to perl. Don't say that out loud though. You won't make any friends.
+
+The next chapter goes over Rust's module system. It's straightforward once you "get it," but you're coming from node.js. Node has the simplest module system that I've ever used. Once you get over the first few Rust module WTFs, it won't stand in your way again.
