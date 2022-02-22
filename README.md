@@ -210,5 +210,5 @@ First you must cd into `crates/day-22/wapc-guest`
 
 ## License
 
-Book: Creative Commons BY-NC-ND 4.0
+Book: Creative Commons BY-NC 4.0
 Code: Creative Commons BY 4.0
