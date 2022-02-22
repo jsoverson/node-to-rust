@@ -2,7 +2,7 @@
 
 == A guide to Rust from a node.js developer's perspective.
 
-Welcome to the wonderful world of Rust! Each chapter will take concepts you know in JavaScript and node.js and translate them to their Rust counterparts. The first chapters start with the basics, like getting set up with Rust via a tool similar to `nvm` (`rustup`), using the package manager (`cargo`), and setting up VS Code. Later chapters go over language gotchas, how to perform common JavaScript tasks in Rust, and we'll finish up by touching on solid dependencies to start adding to your projectss.
+Each chapter will take concepts you know in JavaScript and node.js and translate them to their Rust counterparts. The first chapters start with the basics, like getting set up with Rust via a tool similar to `nvm` (`rustup`), using the package manager (`cargo`), and setting up VS Code. Later chapters go over language gotchas, how to perform common JavaScript tasks in Rust, and we'll finish up by touching on solid dependencies to start adding to your projectss.
 
 == Wait, why does anyone need to learn anything but JavaScript?
 

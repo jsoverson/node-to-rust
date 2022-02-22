@@ -14,6 +14,7 @@
 
 = Go From JavaScript to Rust
 
+include::./chapters/preface.adoc[leveloffset=1]
 include::./chapters/chapter-0-introduction.adoc[leveloffset=1]
 include::./chapters/chapter-1-rustup.adoc[leveloffset=1]
 include::./chapters/chapter-2-cargo.adoc[leveloffset=1]
