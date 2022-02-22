@@ -9,3 +9,7 @@ Thank you everyone who contributed, provided feedback, and otherwise helped make
 ## A note on contributions:
 
 The spirit of this book and its original posts can be summed up as "Get to the point. Fast." The JavaScript and node.js community is top-notch when it comes to practical examples and working example code. I missed that when I started working with Rust. I began the original series to help those coming down this same path and I'd like to maintain that spirit as much as possible. If the book is outright *wrong*, then please contribute fixes. Otherwise, please err on the side of "gets the point across" vs 100% technical accuracy.
+
+## Cover image
+
+Photo by https://unsplash.com/@jayrheike?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText[Jay Heike] on https://unsplash.com/s/photos/rust?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText[Unsplash]
