@@ -1,7 +1,7 @@
 [preface]
 # Preface
 
-This book started as a series of posts on https://vino.dev/blog[vino.dev's blog] during December 2021. The series generated more interest than we ever expected and it started to take on a life of its own. Since then we've had numerous publishers and volunteers looking to extend this series and its reach. We converted the blog posts to asciidoc and put together the scaffolding necessary to turn it into an e-book. The book's source files and all the project's source code are open source under Creative Commons licenses. You are welcome and encouraged to submit contributions, fixed, translations, or new chapters as you see fit.
+This book started as a series of posts on https://vino.dev/blog[vino.dev's blog] during December 2021. The series generated more interest than we ever expected and it started to take on a life of its own. Since then we've had numerous publishers and volunteers looking to extend this series and its reach. We converted the blog posts to asciidoc and put together the scaffolding necessary to turn it into an e-book. The book's source files and all the project's source code are open source under Creative Commons licenses. You are welcome and encouraged to submit contributions, fixes, translations, or new chapters as you see fit.
 
 Thank you everyone who contributed, provided feedback, and otherwise helped make the effort worthwhile. Special thanks go to my wife Kate Lane and my children Finn, Norah, and Elliot who tolerated me writing all day, every day over the 2021 holidays.
 
