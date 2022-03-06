@@ -221,7 +221,7 @@ fn main() {
 fn needs_mutable_ref(map: &mut HashMap<&str, String>) {}
 ----
 
-As you're starting with Rust, you may find many of your errors can be solved by just switching around around the order of your code. Give it a shot before ripping your hair out.
+As you're starting with Rust, you may find many of your errors can be solved by just switching around the order of your code. Give it a shot before ripping your hair out.
 
 === References support session
 
