@@ -98,7 +98,7 @@ help: you might be missing a string literal to format with
 error: could not compile `day-4-strings-wtf-1` due to previous error
 ----
 
-If you expected this to work, you'd be normal. In most languages a string is a string is a string. Not in Rust. Do pay attention to the error message though. Rust's error messages are _leagues_ beyond the error messages you're probably used to. This message not only describes the problem, but shows you exactly where it occurs *_AND_* tells you exactly what you need to do to fix it. `println!()` requires a string literal as the first argument and supports a formatting syntax for replacing portions with variables. Change your program to the following to get back on track.
+If you expected this to work, you'd be normal. In most languages a string is a string. Not in Rust. Do pay attention to the error message though. Rust's error messages are _leagues_ beyond the error messages you're probably used to. This message not only describes the problem, but shows you exactly where it occurs *_AND_* tells you exactly what you need to do to fix it. `println!()` requires a string literal as the first argument and supports a formatting syntax for replacing portions with variables. Change your program to the following to get back on track.
 
 [source,rust]
 ----
