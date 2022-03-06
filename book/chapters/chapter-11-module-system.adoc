@@ -91,7 +91,7 @@ mod my_module {
 
 Separating logic into different files is important for humans. Not Rust. Luckily Rust has support for automatically looking up modules on the local filesystem.
 
-Let's say we want to extract `my_module` into another file. We cut and paste its code into a file called `my_module.rs` and keep an empty `mod my_module;` in our `main.js`. The result looks like this:
+Let's say we want to extract `my_module` into another file. We cut and paste its code into a file called `my_module.rs` and keep an empty `mod my_module;` in our `main.rs`. The result looks like this:
 
 [source,rust]
 ----
@@ -116,7 +116,7 @@ pub mod submodule {
 }
 ----
 
-Our `main.js` shows we're declaring a module called `my_module`, but it's empty. Rust needs to find it.
+Our `main.rs` shows we're declaring a module called `my_module`, but it's empty. Rust needs to find it.
 
 === How Rust finds files
 
