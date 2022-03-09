@@ -149,7 +149,7 @@ fn needs_a_string(argument: String) {}
 
 `something.to_string()` converts _something_ into a string. It's commonly implemeted as part of the `Display` trait. You'll see a lot of posts that recommend `.to_string()` and a lot that don't.
 
-The nuances in the recommendation stem from how much you want the compiler to help you. As your applications grow — especially when you start to deal with generics — you'll inevitably refactor some types into other types. A value that was initially a `&str` might end up being refactored into something else. If the new value still implements `Display`, then it has a `.to_string()` method. The compiler won't complain.t
+The nuances in the recommendation stem from how much you want the compiler to help you. As your applications grow — especially when you start to deal with generics — you'll inevitably refactor some types into other types. A value that was initially a `&str` might end up being refactored into something else. If the new value still implements `Display`, then it has a `.to_string()` method. The compiler won't complain.
 
 In contrast, `.to_owned()` turns something borrowed into something owned, often by cloning. Turning a borrowed _`not-string`_ into an owned _`not-string`_ gives the compiler the context necessary to raise an error. If you're OK with the difference, it's easy to change a `.to_owned()` into a `.to_string()`. If you weren't expecting it, then you highlighted an issue before it became a problem.
 
