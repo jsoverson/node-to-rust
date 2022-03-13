@@ -37,7 +37,7 @@ This guide will go through how to make a waPC host in Rust to run the same modul
 
 === Our test module
 
-We've pre-built a https://github.com/vinodotdev/node-to-rust/blob/master/crates/day-21/wapc-guest/build/wapc_guest.wasm[test module] as part of this book. It has one exposed operation, `hello` that takes a string and returns a string.
+We've pre-built a https://github.com/vinodotdev/node-to-rust/blob/master/src/crates/day-21/wapc-guest/build/wapc_guest.wasm[test module] as part of this book. It has one exposed operation, `hello` that takes a string and returns a string.
 
 === Building a waPC host
 
