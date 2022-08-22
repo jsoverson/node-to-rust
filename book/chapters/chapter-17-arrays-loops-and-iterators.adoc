@@ -209,7 +209,7 @@ Rust's `loop` expression simply loops forever. It's handier than you might think
 let n = 0;
 
 while (true) {
-  n{pp};
+  n++;
   if (n > 3) break;
   else console.log(n);
 }
