@@ -42,7 +42,7 @@ Rust does not have a for loop like this for good reason. It's cumbersome syntax 
 2. We test if the variable is greater than the maximum value in the range (e.g. `i < max`).
 3. Every loop we increment the variable by `1`.
 
-Rust generalizes this use case into its `for…in` expression combined with the [range operator](https://doc.rust-lang.org/std/ops/struct.Range.html) (e.g. `0..10`).
+Rust generalizes this use case into its `for…in` expression combined with the https://doc.rust-lang.org/std/ops/struct.Range.html[range operator] (e.g. `0..10`).
 
 [source,ts]
 ----
@@ -209,7 +209,7 @@ Rust's `loop` expression simply loops forever. It's handier than you might think
 let n = 0;
 
 while (true) {
-  n{pp};
+  n++;
   if (n > 3) break;
   else console.log(n);
 }
@@ -638,7 +638,7 @@ None
 
 It's bad form to use `.collect()` to return a specific data structure when you could return the iterator itself. Returning an iterator keeps things flexible and retains the lazy evaluation Rust programmers expect. Since the basic `Iterator` is a trait, we can return it the same way we've returned closures and other values in previous guides.
 
-The data structure below is part of the link:[day-17-names](https://github.com/vinodotdev/node-to-rust/tree/master/src/crates/day-17/names)[day-17-names] example project. It holds its own `Vec` of names and provides a method to search the list.
+The data structure below is part of the link:https://github.com/vinodotdev/node-to-rust/tree/master/src/crates/day-17/names[day-17-names] example project. It holds its own `Vec` of names and provides a method to search the list.
 
 Rather than returning a `Vec<&String>`, it returns an `Iterator` of borrowed ``String``s.
 
