@@ -9,6 +9,10 @@ MAKEFLAGS += --no-builtin-rules
 book:
 	bundle exec asciidoctor-pdf -a source-highlighter=rouge book/book.adoc --o from-javascript-to-rust.pdf
 
+.PHONY: book-epub
+book-epub:
+	bundle exec asciidoctor-epub3 -a source-highlighter=rouge book/book.adoc --o from-javascript-to-rust.epub
+
 .PHONY: deps
 deps:
 	bundle install
