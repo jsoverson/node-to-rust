@@ -13,9 +13,9 @@ https://code.visualstudio.com/[Visual Studio Code] dominated the JavaScript ecos
 
 == Core language setup
 
-There are two primary plugins, *rust* (https://marketplace.visualstudio.com/items?itemName=rust-lang.rust[rust-lang.rust]) and *rust-analyzer* (https://marketplace.visualstudio.com/items?itemName=matklad.rust-analyzer[matklad.rust-analyzer]). They promise similar features but I could never get the *rust* plugin to work reliably. *Rust-analyzer* has been great from day one.
+For VS Code, you'll want to install the *rust-analyzer* extension (https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer[rust-lang.rust-analyzer]). This is the official extension for Rust development in VS Code, providing features like code completion, go to definition, and inline hints.
 
-WARNING: The *rust* (https://marketplace.visualstudio.com/items?itemName=rust-lang.rust[rust-lang.rust]) and *rust-analyzer* (https://marketplace.visualstudio.com/items?itemName=matklad.rust-analyzer[matklad.rust-analyzer]) plugins don't work well together. If you are exploring both, make sure you disable one to get a fair view of the other.
+NOTE: There used to be an older *rust* extension (https://marketplace.visualstudio.com/items?itemName=rust-lang.rust[rust-lang.rust]) but it has been deprecated in favor of rust-analyzer. If you have the old extension installed, you should uninstall it and switch to rust-analyzer.
 
 To install *rust-analyzer*, search for it in the extensions pane or press `Ctrl+Shift+P` then enter:
 
@@ -47,7 +47,8 @@ You can run `cargo clippy` yourself or set rust-analyzer to run `clippy` on save
 [source,json]
 ----
 {
-  "rust-analyzer.checkOnSave.command": "clippy"
+  "rust-analyzer.checkOnSave": true,
+  "rust-analyzer.check.command": "clippy",
 }
 ----
 
@@ -94,20 +95,20 @@ Install with `Ctrl+Shift+P` then:
 ext install vadimcn.vscode-lldb
 ----
 
-=== https://marketplace.visualstudio.com/items?itemName=bungcip.better-toml[better-toml]
+=== https://marketplace.visualstudio.com/items?itemName=tamasfe.even-better-toml[even-better-toml]
 
-https://marketplace.visualstudio.com/items?itemName=bungcip.better-toml[bungcip.better-toml] adds syntax highlighting for TOML files
+https://marketplace.visualstudio.com/items?itemName=tamasfe.even-better-toml[even-better-toml] adds syntax highlighting for TOML files
 
 Install with `Ctrl+Shift+P` then:
 
 [source,sh]
 ----
-ext install bungcip.better-toml
+ext install tamasfe.even-better-toml
 ----
 
-=== https://marketplace.visualstudio.com/items?itemName=serayuzgur.crates[crates]
+=== https://marketplace.visualstudio.com/items?itemName=fill-labs.dependi[dependi]
 
-https://marketplace.visualstudio.com/items?itemName=serayuzgur.crates[serayuzgur.crates] shows you the latest versions of your dependencies and gives you quick access to update them.
+https://marketplace.visualstudio.com/items?itemName=fill-labs.dependi[fill-labs.dependi] shows you the latest versions of your dependencies and gives you quick access to update them.
 
 image./images/blog/node-to-rust/vs-code-crates.gif[Inline crate versions]
 
@@ -115,7 +116,7 @@ Install with `Ctrl+Shift+P` then:
 
 [source,sh]
 ----
-ext install serayuzgur.crates
+ext install fill-labs.dependi
 ----
 
 === https://marketplace.visualstudio.com/items?itemName=belfz.search-crates-io[search-crates-io]
