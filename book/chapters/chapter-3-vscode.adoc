@@ -106,9 +106,9 @@ Install with `Ctrl+Shift+P` then:
 ext install tamasfe.even-better-toml
 ----
 
-=== https://marketplace.visualstudio.com/items?itemName=serayuzgur.crates[crates]
+=== https://marketplace.visualstudio.com/items?itemName=fill-labs.dependi[dependi]
 
-https://marketplace.visualstudio.com/items?itemName=serayuzgur.crates[serayuzgur.crates] shows you the latest versions of your dependencies and gives you quick access to update them.
+https://marketplace.visualstudio.com/items?itemName=fill-labs.dependi[fill-labs.dependi] shows you the latest versions of your dependencies and gives you quick access to update them.
 
 image./images/blog/node-to-rust/vs-code-crates.gif[Inline crate versions]
 
@@ -116,7 +116,7 @@ Install with `Ctrl+Shift+P` then:
 
 [source,sh]
 ----
-ext install serayuzgur.crates
+ext install fill-labs.dependi
 ----
 
 === https://marketplace.visualstudio.com/items?itemName=belfz.search-crates-io[search-crates-io]
