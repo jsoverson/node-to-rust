@@ -47,7 +47,8 @@ You can run `cargo clippy` yourself or set rust-analyzer to run `clippy` on save
 [source,json]
 ----
 {
-  "rust-analyzer.checkOnSave.command": "clippy"
+  "rust-analyzer.checkOnSave": true,
+  "rust-analyzer.check.command": "clippy",
 }
 ----
 
