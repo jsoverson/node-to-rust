@@ -95,15 +95,15 @@ Install with `Ctrl+Shift+P` then:
 ext install vadimcn.vscode-lldb
 ----
 
-=== https://marketplace.visualstudio.com/items?itemName=bungcip.better-toml[better-toml]
+=== https://marketplace.visualstudio.com/items?itemName=tamasfe.even-better-toml[even-better-toml]
 
-https://marketplace.visualstudio.com/items?itemName=bungcip.better-toml[bungcip.better-toml] adds syntax highlighting for TOML files
+https://marketplace.visualstudio.com/items?itemName=tamasfe.even-better-toml[even-better-toml] adds syntax highlighting for TOML files
 
 Install with `Ctrl+Shift+P` then:
 
 [source,sh]
 ----
-ext install bungcip.better-toml
+ext install tamasfe.even-better-toml
 ----
 
 === https://marketplace.visualstudio.com/items?itemName=serayuzgur.crates[crates]
