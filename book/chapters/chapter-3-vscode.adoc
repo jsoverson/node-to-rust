@@ -13,9 +13,9 @@ https://code.visualstudio.com/[Visual Studio Code] dominated the JavaScript ecos
 
 == Core language setup
 
-There are two primary plugins, *rust* (https://marketplace.visualstudio.com/items?itemName=rust-lang.rust[rust-lang.rust]) and *rust-analyzer* (https://marketplace.visualstudio.com/items?itemName=matklad.rust-analyzer[matklad.rust-analyzer]). They promise similar features but I could never get the *rust* plugin to work reliably. *Rust-analyzer* has been great from day one.
+For VS Code, you'll want to install the *rust-analyzer* extension (https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer[rust-lang.rust-analyzer]). This is the official extension for Rust development in VS Code, providing features like code completion, go to definition, and inline hints.
 
-WARNING: The *rust* (https://marketplace.visualstudio.com/items?itemName=rust-lang.rust[rust-lang.rust]) and *rust-analyzer* (https://marketplace.visualstudio.com/items?itemName=matklad.rust-analyzer[matklad.rust-analyzer]) plugins don't work well together. If you are exploring both, make sure you disable one to get a fair view of the other.
+NOTE: There used to be an older *rust* extension (https://marketplace.visualstudio.com/items?itemName=rust-lang.rust[rust-lang.rust]) but it has been deprecated in favor of rust-analyzer. If you have the old extension installed, you should uninstall it and switch to rust-analyzer.
 
 To install *rust-analyzer*, search for it in the extensions pane or press `Ctrl+Shift+P` then enter:
 
