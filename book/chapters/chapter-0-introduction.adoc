@@ -12,7 +12,7 @@ When you start stretching passed what JavaScript is best at, it's helpful to hav
 
 == Why Rust?
 
-You could use C, C{pp}, C#, Go, Java, Kotlin, Haskell or a hundred others. Rust is notoriously difficult even for system programmers to get into. Why bother with Rust? Think about your languages as tools in your toolbox. When you fill your toolbox, you don't want 10 tools that solve similar problems. You want tools that complement each other and give you the ability to fix everything an anything. You already have JavaScript, a developer super-tool. It's a high level language that's good enough to run just about everything everywhere. If you're picking up a new language, you might as well go to the extreme and pick a no-compromise, low-level powerhouse.
+You could use C, C{pp}, C#, Go, Java, Kotlin, Haskell or a hundred others. Rust is notoriously difficult even for system programmers to get into. Why bother with Rust? Think about your languages as tools in your toolbox. When you fill your toolbox, you don't want 10 tools that solve similar problems. You want tools that complement each other and give you the ability to fix everything and anything. You already have JavaScript, a developer super-tool. It's a high level language that's good enough to run just about everything everywhere. If you're picking up a new language, you might as well go to the extreme and pick a no-compromise, low-level powerhouse.
 
 Also, WebAssembly.
 

@@ -2,7 +2,7 @@
 
 == Introduction
 
-`cargo` is Rust's package manager and operates similarly to `npm` from node's universe. Cargo downloads dependiencs from https://crates.io[crates.io] by default. You can register an account and publish modules just as you would on https://npmjs.com[npmjs.com]. With some minor mapping you can translate almost everything you're used to in node to Rust.
+`cargo` is Rust's package manager and operates similarly to `npm` from node's universe. Cargo downloads dependencies from https://crates.io[crates.io] by default. You can register an account and publish modules just as you would on https://npmjs.com[npmjs.com]. With some minor mapping you can translate almost everything you're used to in node to Rust.
 
 == `npm` to `cargo` mapping
 
